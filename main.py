@@ -3,6 +3,7 @@ from pyrogram.types import Message, ChatPrivileges
 from pyrogram.errors import FloodWait, UserAdminInvalid
 import asyncio
 import os
+from gtts import gTTS # TTS ke liye
 
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
@@ -17,7 +18,7 @@ tagging = False
 async def ping(client, message: Message):
     await message.edit("🏓 Pong! Bot zinda hai")
 
-# /help
+# /help - TTS ADD KIYA
 @app.on_message(filters.me & filters.command("help"))
 async def help(client, message: Message):
     text = """**🔥 Ishika Userbot Commands 🔥**
@@ -39,8 +40,36 @@ async def help(client, message: Message):
 `/info` - Reply karke user info
 `/purge` - Reply se niche sab delete
 
+**Broadcast wale:**
+`/broadcast msg` - Sabko DM + Group
+`/gcast msg` - Sirf Groups me
+`/dcast msg` - Sirf DM me
+
+**TTS wala:**
+`/tts text` - Text ko voice me convert
+
 Made with 💜"""
     await message.edit(text)
+
+# /tts NEW COMMAND
+@app.on_message(filters.me & filters.command("tts"))
+async def tts_cmd(client, message: Message):
+    if len(message.command) < 2:
+        return await message.edit("Use: `/tts hello kaise ho`")
+    
+    text = " ".join(message.command[1:])
+    await message.edit("🎤 **Voice bana raha hu...**")
+    
+    try:
+        tts = gTTS(text=text, lang='hi') # 'hi' = Hindi, 'en' = English
+        tts.save("voice.ogg")
+        
+        await client.send_voice(message.chat.id, "voice.ogg", caption=f"**TTS:** {text}")
+        await message.delete()
+        os.remove("voice.ogg") # file delete
+        
+    except Exception as e:
+        await message.edit(f"Error: `{e}`")
 
 # /tagall - ek karke
 @app.on_message(filters.me & filters.command("tagall"))
@@ -71,7 +100,7 @@ async def tagall(client, message: Message):
                 f"[{user.first_name}](tg://user?id={user.id}) {msg}"
             )
             count += 1
-            await asyncio.sleep(5) # spam se bachne ke liye
+            await asyncio.sleep(5)
             
         except FloodWait as e:
             await asyncio.sleep(e.value)
@@ -96,18 +125,8 @@ async def promote(client, message: Message):
         return await message.edit("Reply karke use kar")
     try:
         await client.promote_chat_member(
-            message.chat.id,
-            message.reply_to_message.from_user.id,
-            privileges=ChatPrivileges(
-                can_manage_chat=True,
-                can_delete_messages=True,
-                can_manage_video_chats=True,
-                can_restrict_members=True,
-                can_promote_members=False,
-                can_change_info=True,
-                can_invite_users=True,
-                can_pin_messages=True
-            )
+            message.chat.id, message.reply_to_message.from_user.id,
+            privileges=ChatPrivileges(can_manage_chat=True, can_delete_messages=True, can_manage_video_chats=True, can_restrict_members=True, can_promote_members=False, can_change_info=True, can_invite_users=True, can_pin_messages=True)
         )
         await message.edit("✅ Promote kar diya")
     except UserAdminInvalid:
@@ -119,11 +138,7 @@ async def demote(client, message: Message):
     if not message.reply_to_message:
         return await message.edit("Reply karke use kar")
     try:
-        await client.promote_chat_member(
-            message.chat.id,
-            message.reply_to_message.from_user.id,
-            privileges=ChatPrivileges()
-        )
+        await client.promote_chat_member(message.chat.id, message.reply_to_message.from_user.id, privileges=ChatPrivileges())
         await message.edit("✅ Demote kar diya")
     except:
         await message.edit("Error aa gaya")
@@ -186,10 +201,7 @@ async def purge(client, message: Message):
             pass
     await client.send_message(chat_id, "✅ Purged", disable_notification=True)
 
-print("Userbot Started!")
-app.run()
-
-# /broadcast command - DM + Groups dono me
+# /broadcast
 @app.on_message(filters.me & filters.command("broadcast"))
 async def broadcast(client, message: Message):
     if len(message.command) < 2:
@@ -200,14 +212,12 @@ async def broadcast(client, message: Message):
     
     sent = 0
     failed = 0
-    
     async for dialog in client.get_dialogs():
         if dialog.chat.type in ["private", "group", "supergroup"]:
             try:
                 await client.send_message(dialog.chat.id, f"📢 **Broadcast**\n\n{msg}")
                 sent += 1
-                await asyncio.sleep(3) # spam se bachne ke liye
-                
+                await asyncio.sleep(3)
             except FloodWait as e:
                 await asyncio.sleep(e.value)
             except:
@@ -215,7 +225,7 @@ async def broadcast(client, message: Message):
     
     await message.reply(f"**Broadcast Complete** ✅\n**Sent:** `{sent}` chats\n**Failed:** `{failed}` chats")
 
-# /gcast - sirf groups me
+# /gcast
 @app.on_message(filters.me & filters.command("gcast"))
 async def gcast(client, message: Message):
     if len(message.command) < 2:
@@ -231,13 +241,12 @@ async def gcast(client, message: Message):
                 await client.send_message(dialog.chat.id, f"📢 **Group Broadcast**\n\n{msg}")
                 sent += 1
                 await asyncio.sleep(3)
-                
             except:
                 pass
     
     await message.reply(f"**Group Broadcast Complete** ✅\n**Sent:** `{sent}` groups")
 
-# /dcast - sirf DM me
+# /dcast
 @app.on_message(filters.me & filters.command("dcast"))
 async def dcast(client, message: Message):
     if len(message.command) < 2:
@@ -253,8 +262,10 @@ async def dcast(client, message: Message):
                 await client.send_message(dialog.chat.id, f"📢 **Message**\n\n{msg}")
                 sent += 1
                 await asyncio.sleep(3)
-                
             except:
                 pass
     
     await message.reply(f"**DM Broadcast Complete** ✅\n**Sent:** `{sent}` users")
+
+print("Userbot Started!")
+app.run()
