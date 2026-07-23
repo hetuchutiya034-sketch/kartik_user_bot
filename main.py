@@ -19,7 +19,7 @@ c.execute("CREATE TABLE IF NOT EXISTS autoreply (user_id INTEGER, keyword TEXT, 
 conn.commit()
 
 user_sessions = {}
-login_temp = {} # step by step data store
+login_temp = {}
 
 async def get_user_client(user_id):
     data = c.execute("SELECT session FROM users WHERE user_id=?", (user_id,)).fetchone()
@@ -31,7 +31,7 @@ async def get_user_client(user_id):
     return user_sessions[user_id]
 
 WELCOME_TEXT = f"""**━━━━━━━━━━━**
-**🔥 PRO TEAM BOT V4 🔥**
+**🔥 PRO TEAM BOT V1 FIXED 🔥**
 **━━━━━━━━━━━**
 
 **Hey {{name}} 👋**
@@ -48,13 +48,11 @@ Buttons se use karlo 👇
 async def start(c,m):
     uid = m.from_user.id
     name = m.from_user.first_name
-    login_temp.pop(uid, None) # reset login
+    login_temp.pop(uid, None)
     buttons = [
         [KeyboardButton("🚀 Login"), KeyboardButton("🔓 Logout")],
         [KeyboardButton("📢 Gcast"), KeyboardButton("💌 Dcast")],
         [KeyboardButton("📊 Stats"), KeyboardButton("👤 Info")],
-        [KeyboardButton("🎨 Imagine"), KeyboardButton("🖼️ Logo")],
-        [KeyboardButton("🗣️ TTS"), KeyboardButton("⚡ AutoReply")],
         [KeyboardButton("📋 All Cmds"), KeyboardButton("👑 Owner")]
     ]
     if uid == ADMIN_ID:
@@ -69,96 +67,97 @@ async def login_start(c,m):
     await m.reply("**Please send your API_ID**\n\nGet from: https://my.telegram.org")
 
 # ===== STEP HANDLER =====
-@bot.on_message(filters.text & filters.private & ~filters.command())
+@bot.on_message(filters.text & filters.private)
 async def step_handler(c,m):
     uid = m.from_user.id
     text = m.text
 
-    if uid not in login_temp:
-        return await button_handler(c,m) # normal button
+    if uid in login_temp: # LOGIN STEP ME HAI
+        step = login_temp[uid]["step"]
 
-    step = login_temp[uid]["step"]
+        if step == "api_id":
+            if not text.isdigit(): return await m.reply("**❌ Galat API_ID**\nSirf number bhejo")
+            login_temp[uid]["api_id"] = text
+            login_temp[uid]["step"] = "api_hash"
+            return await m.reply("**Please send your API_HASH**")
 
-    # STEP 2: API_ID
-    if step == "api_id":
-        if not text.isdigit(): return await m.reply("**❌ Galat API_ID**\nSirf number bhejo")
-        login_temp[uid]["api_id"] = text
-        login_temp[uid]["step"] = "api_hash"
-        return await m.reply("**Please send your API_HASH**")
+        if step == "api_hash":
+            login_temp[uid]["api_hash"] = text
+            login_temp[uid]["step"] = "phone"
+            return await m.reply("**Now please send your PHONE_NUMBER along with the country code.**\n**Example :** `+19876543210`")
 
-    # STEP 3: API_HASH
-    if step == "api_hash":
-        login_temp[uid]["api_hash"] = text
-        login_temp[uid]["step"] = "phone"
-        return await m.reply("**Now please send your PHONE_NUMBER along with the country code.**\n**Example :** `+19876543210`")
+        if step == "phone":
+            login_temp[uid]["phone"] = text
+            api_id = int(login_temp[uid]["api_id"])
+            api_hash = login_temp[uid]["api_hash"]
+            phone = text
+            temp = Client(f"temp_{uid}", api_id=api_id, api_hash=api_hash, in_memory=True)
+            await temp.connect()
+            try:
+                sent = await temp.send_code(phone)
+                login_temp[uid]["phash"] = sent.phone_code_hash
+                login_temp[uid]["temp_client"] = temp
+                login_temp[uid]["step"] = "otp"
+                await m.reply("**Please check for an OTP in official telegram account. If you got it, send OTP here after reading the below format.**\n**If OTP is 12345, please send it as `1 2 3 4 5`.**")
+            except Exception as e:
+                await temp.disconnect()
+                login_temp.pop(uid)
+                await m.reply(f"**❌ Error:** `{e}`")
 
-    # STEP 4: PHONE
-    if step == "phone":
-        login_temp[uid]["phone"] = text
-        api_id = int(login_temp[uid]["api_id"])
-        api_hash = login_temp[uid]["api_hash"]
-        phone = text
-
-        temp = Client(f"temp_{uid}", api_id=api_id, api_hash=api_hash, in_memory=True)
-        await temp.connect()
-        try:
-            sent = await temp.send_code(phone)
-            login_temp[uid]["phash"] = sent.phone_code_hash
-            login_temp[uid]["temp_client"] = temp
-            login_temp[uid]["step"] = "otp"
-            await m.reply("**Please check for an OTP in official telegram account. If you got it, send OTP here after reading the below format.**\n**If OTP is 12345, please send it as `1 2 3 4 5`.**")
-        except Exception as e:
-            await temp.disconnect()
-            login_temp.pop(uid)
-            await m.reply(f"**❌ Error:** `{e}`\nDobara `/start` karke try karo")
-
-    # STEP 5: OTP
-    elif step == "otp":
-        code = text.replace(" ", "")
-        temp = login_temp[uid]["temp_client"]
-        phash = login_temp[uid]["phash"]
-        phone = login_temp[uid]["phone"]
-        try:
-            session = await temp.sign_in(phone, phash, code)
-            user = await temp.get_me()
-            c.execute("INSERT OR REPLACE INTO users VALUES (?,?,?,?,?,?,?,?,?)",(uid, user.first_name, user.username, phone, session, None, None, None, None))
-            conn.commit()
-            await temp.disconnect()
-            login_temp.pop(uid)
-            await m.reply(f"**✅ Login Success**\nWelcome {user.first_name} ✅\nAb `/stats` try karo")
-        except SessionPasswordNeeded:
-            login_temp[uid]["step"] = "password"
-            await m.reply("**Your account has enabled two-step verification. Please provide the password.**")
-        except PhoneCodeInvalid:
-            await m.reply("**❌ OTP Galat hai**\nFir se OTP bhejo")
-        except Exception as e:
-            await temp.disconnect()
-            login_temp.pop(uid)
-            await m.reply(f"**❌ Error:** `{e}`")
-
-    # STEP 6: PASSWORD
-    elif step == "password":
-        temp = login_temp[uid]["temp_client"]
-        try:
-            await temp.check_password(text)
-            session = await temp.export_session_string()
-            user = await temp.get_me()
+        elif step == "otp":
+            code = text.replace(" ", "")
+            temp = login_temp[uid]["temp_client"]
+            phash = login_temp[uid]["phash"]
             phone = login_temp[uid]["phone"]
-            c.execute("INSERT OR REPLACE INTO users VALUES (?,?,?,?,?,?,?,?,?)",(uid, user.first_name, user.username, phone, session, None, None, None, None))
-            conn.commit()
-            await temp.disconnect()
-            login_temp.pop(uid)
-            await m.reply(f"**✅ Login Success**\nWelcome {user.first_name} ✅\nAb `/stats` try karo")
-        except Exception as e:
-            await m.reply(f"**❌ Password Galat**\nFir se bhejo: `{e}`")
+            try:
+                session = await temp.sign_in(phone, phash, code)
+                user = await temp.get_me()
+                c.execute("INSERT OR REPLACE INTO users VALUES (?,?,?,?,?,?,?,?,?)",(uid, user.first_name, user.username, phone, session, None, None, None, None))
+                conn.commit()
+                await temp.disconnect()
+                login_temp.pop(uid)
+                await m.reply(f"**✅ Login Success**\nWelcome {user.first_name} ✅")
+            except SessionPasswordNeeded:
+                login_temp[uid]["step"] = "password"
+                await m.reply("**Your account has enabled two-step verification. Please provide the password.**")
+            except Exception as e:
+                await temp.disconnect()
+                login_temp.pop(uid)
+                await m.reply(f"**❌ Error:** `{e}`")
 
-# ===== LOGOUT =====
-@bot.on_message(filters.command("logout") & filters.private)
-async def logout(c,m):
-    c.execute("UPDATE users SET session=NULL WHERE user_id=?", (m.from_user.id,)); conn.commit()
-    if m.from_user.id in user_sessions: await user_sessions[m.from_user.id].stop(); del user_sessions[m.from_user.id]
-    login_temp.pop(m.from_user.id, None)
-    await m.reply("**🔓 Logout Success**")
+        elif step == "password":
+            temp = login_temp[uid]["temp_client"]
+            try:
+                await temp.check_password(text)
+                session = await temp.export_session_string()
+                user = await temp.get_me()
+                phone = login_temp[uid]["phone"]
+                c.execute("INSERT OR REPLACE INTO users VALUES (?,?,?,?,?,?,?,?,?)",(uid, user.first_name, user.username, phone, session, None, None, None, None))
+                conn.commit()
+                await temp.disconnect()
+                login_temp.pop(uid)
+                await m.reply(f"**✅ Login Success**\nWelcome {user.first_name} ✅")
+            except Exception as e:
+                await m.reply(f"**❌ Password Galat**\nFir se bhejo")
+        return
+
+    # AGAR LOGIN STEP ME NAHI HAI TO BUTTON HAI
+    await button_handler(c,m)
+
+# ===== BUTTON HANDLER =====
+async def button_handler(c,m):
+    text = m.text
+    uid = m.from_user.id
+    if text == "🔓 Logout": 
+        c.execute("UPDATE users SET session=NULL WHERE user_id=?", (uid,)); conn.commit()
+        if uid in user_sessions: await user_sessions[uid].stop(); del user_sessions[uid]
+        await m.reply("**🔓 Logout Success**")
+    elif text == "📊 Stats": await stats(c,m)
+    elif text == "👤 Info": await info(c,m)
+    elif text == "📢 Gcast": await m.reply("**Format:**\n`/gcast Your Message Here`")
+    elif text == "💌 Dcast": await m.reply("**Format:**\n`/dcast Your Message Here`")
+    elif text == "📋 All Cmds": await m.reply("**Commands:** `/gcast` `/dcast` `/stats` `/info`")
+    elif text == "👑 Owner": await m.reply(f"**Problem hai?**\nMujhe DM karo: [@{OWNER_USERNAME}](https://t.me/{OWNER_USERNAME})")
 
 # ===== USERBOT COMMANDS =====
 @bot.on_message(filters.command("gcast") & filters.private)
@@ -204,16 +203,5 @@ async def info(c,m):
     me = await userbot.get_me()
     await m.reply(f"**👤 YOUR INFO**\n**Name:** {me.first_name}\n**Username:** @{me.username}\n**ID:** `{me.id}`")
 
-# ===== BUTTON HANDLER =====
-async def button_handler(c,m):
-    text = m.text
-    uid = m.from_user.id
-    if text == "🔓 Logout": await logout(c,m)
-    elif text == "📢 Gcast": await m.reply("**Format:**\n`/gcast Your Message Here`")
-    elif text == "💌 Dcast": await m.reply("**Format:**\n`/dcast Your Message Here`")
-    elif text == "📊 Stats": await stats(c,m)
-    elif text == "👤 Info": await info(c,m)
-    elif text == "📋 All Cmds": await m.reply("**Commands:** `/gcast` `/dcast` `/stats` `/info`")
-
-print("PRO TEAM BOT V4 STARTED ✅")
+print("PRO TEAM BOT V1 STARTED ✅")
 bot.run()
