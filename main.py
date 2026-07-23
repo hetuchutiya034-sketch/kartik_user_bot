@@ -34,7 +34,7 @@ async def get_user_client(user_id):
     return user_sessions[user_id]
 
 WELCOME_TEXT = """**━━━━━━━━━━━**
-**🔥 ISHIKA USER BOT V6 🔥**
+**🔥 ISHIKA USER BOT V1 🔥**
 **━━━━━━━━━━━**
 
 **Hey {name} 👋**
@@ -235,8 +235,8 @@ async def listreply(c,m):
     for k,r in data: txt += f"`{k}` -> `{r}`\n"
     await m.reply(txt)
 
-# Auto reply trigger
-@bot.on_message(filters.private & ~filters.command(["start", "login", "logout", "gcast", "dcast", "stats", "info", "imagine", "logo", "tts", "setreply", "delreply", "listreply", "admin", "allusers", "allcmds"]))
+# Auto reply trigger - FIXED
+@bot.on_message(filters.private & ~filters.command(["start", "gcast", "dcast", "stats", "info", "imagine", "logo", "tts", "setreply", "delreply", "listreply", "admin", "allusers", "allcmds"]))
 async def auto_reply_check(c,m):
     data = c.execute("SELECT reply FROM autoreply WHERE user_id=? AND keyword=?", (m.from_user.id, m.text.lower())).fetchone()
     if data: await m.reply(data[0])
@@ -273,5 +273,5 @@ Buttons: Login / Logout
 Aur commands add kar dunga"""
     await m.reply(txt)
 
-print("ISHIKA USER BOT V6 STARTED ✅")
+print("ISHIKA USER BOT V1 STARTED ✅")
 bot.run()
