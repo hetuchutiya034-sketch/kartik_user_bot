@@ -1,4 +1,5 @@
 pyrogram
 tgcrypto
+gtts
+Pillow
 requests
-gTTS
