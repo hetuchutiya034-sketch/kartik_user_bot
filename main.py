@@ -34,7 +34,7 @@ WELCOME_TEXT = f"""**━━━━━━━━━━━**
 
 **35+ COMMANDS AVAILABLE**
 
-**Made by @{KARTIK_NISHAD_3}**
+**Made by @{OWNER_USERNAME}**
 **━━━━━━━━━━━**
 """
 
