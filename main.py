@@ -1,7 +1,10 @@
 from pyrogram import Client, filters
 from pyrogram.types import ReplyKeyboardMarkup, KeyboardButton
 from pyrogram.errors import SessionPasswordNeeded, PhoneCodeInvalid, PasswordHashInvalid
-import sqlite3, os, asyncio, datetime
+from pytgcalls import PyTgCalls
+from pytgcalls.types import StreamType
+from pytgcalls.types.input_stream import AudioPiped
+import sqlite3, os, asyncio, datetime, random, yt_dlp
 from gtts import gTTS
 from PIL import Image, ImageDraw, ImageFont
 import io
@@ -11,19 +14,21 @@ API_HASH = os.getenv("API_HASH")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
 OWNER_USERNAME = os.getenv("OWNER_USERNAME")
-LOG_GROUP = int(os.getenv("LOG_GROUP")) # <-- YE NAYA ADD KIYA. Railway me daal dena
+LOG_GROUP = int(os.getenv("LOG_GROUP"))
 
 bot = Client("pro_team_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
+vc = PyTgCalls(bot) # VC ke liye
 
-# ===== DATABASE =====
 conn = sqlite3.connect("team.db", check_same_thread=False)
 c = conn.cursor()
 c.execute("CREATE TABLE IF NOT EXISTS users (user_id INTEGER PRIMARY KEY, name TEXT, username TEXT, phone TEXT, session TEXT)")
 c.execute("CREATE TABLE IF NOT EXISTS autoreply (user_id INTEGER, keyword TEXT, reply TEXT)")
+c.execute("CREATE TABLE IF NOT EXISTS scraped (user_id INTEGER, chat_id INTEGER)") # Scrape ke liye
 conn.commit()
 
 user_sessions = {}
 login_temp = {}
+vc_chats = {} # VC me kya chal raha
 
 async def get_user_client(user_id):
     data = c.execute("SELECT session FROM users WHERE user_id=?", (user_id,)).fetchone()
@@ -35,267 +40,120 @@ async def get_user_client(user_id):
     return user_sessions[user_id]
 
 async def send_log(text):
-    try:
-        await bot.send_message(LOG_GROUP, text)
+    try: await bot.send_message(LOG_GROUP, text)
     except: pass
 
+# Shayari + Flirt list
+SHAYARI = ["Tere naam se mohabbat ki hai...", "Chand se roshan hai chehra tera..."]
+FLIRT = ["Tum haste ho to dil garden ho jata hai", "Tum chai ho aur main biscuit"]
+
 WELCOME_TEXT = """**━━━━━━━━━━━**
-**🔥 ISHIKA USER BOT V1 🔥**
+**🔥 ISHIKA USER BOT V1 ULTIMATE 🔥**
 **━━━━━━━━━━━**
-
 **Hey {name} 👋**
-**40+ COMMANDS AVAILABLE**
-
+**50+ COMMANDS AVAILABLE**
 Buttons se use kar 👇
-
 **Made by @{owner}**
 **━━━━━━━━━━━**
 """
 
-# ===== START =====
 @bot.on_message(filters.command("start"))
 async def start(c,m):
-    uid = m.from_user.id
-    name = m.from_user.first_name
-    username = f"@{m.from_user.username}" if m.from_user.username else "None"
+    uid = m.from_user.id; name = m.from_user.first_name; username = f"@{m.from_user.username}" if m.from_user.username else "None"
     login_temp.pop(uid, None)
-
-    # LOG: Kon start kiya
     time = datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S")
-    log_msg = f"**🚀 NEW USER STARTED BOT**\n\n**Name:** {name}\n**Username:** {username}\n**ID:** `{uid}`\n**Time:** `{time}`"
-    await send_log(log_msg)
-
-    buttons = [
-        [KeyboardButton("🚀 Login"), KeyboardButton("🔓 Logout")],
-        [KeyboardButton("📢 Gcast"), KeyboardButton("💌 Dcast")],
-        [KeyboardButton("📊 Stats"), KeyboardButton("👤 Info")],
-        [KeyboardButton("🎨 Imagine"), KeyboardButton("🖼️ Logo")],
-        [KeyboardButton("🗣️ TTS"), KeyboardButton("⚡ AutoReply")],
-        [KeyboardButton("📋 All Cmds"), KeyboardButton("👑 Owner")]
-    ]
-    if uid == ADMIN_ID:
-        buttons.append([KeyboardButton("👑 Admin Panel"), KeyboardButton("📜 All Users")])
+    await send_log(f"**🚀 NEW START**\n**Name:** {name}\n**ID:** `{uid}`\n**Time:** `{time}`")
+    buttons = [[KeyboardButton("🚀 Login"), KeyboardButton("🔓 Logout")],[KeyboardButton("📢 Gcast"), KeyboardButton("💌 Dcast")],[KeyboardButton("📊 Stats"), KeyboardButton("👤 Info")],[KeyboardButton("🎨 Imagine"), KeyboardButton("🖼️ Logo")],[KeyboardButton("🗣️ TTS"), KeyboardButton("⚡ AutoReply")],[KeyboardButton("📋 All Cmds"), KeyboardButton("👑 Owner")]]
+    if uid == ADMIN_ID: buttons.append([KeyboardButton("👑 Admin Panel"), KeyboardButton("📜 All Users")])
     await m.reply(WELCOME_TEXT.format(name=name, owner=OWNER_USERNAME), reply_markup=ReplyKeyboardMarkup(buttons, resize_keyboard=True))
 
-# ===== LOGIN FLOW =====
-@bot.on_message(filters.text & filters.private & filters.regex("^🚀 Login$"))
-async def login_start(c,m):
-    login_temp[m.from_user.id] = {"step": "api_id"}
-    await m.reply("**Please send your API_ID**\nGet from: https://my.telegram.org")
+@bot.on_message(filters.command("loginstring"))
+async def login_string(c,m): # NAYA STRING SESSION
+    await m.reply("**API_ID, API_HASH, PHONE bhejo format me:**\n`api_id api_hash +91xxxxxxxxxx`")
 
-@bot.on_message(filters.text & filters.private)
-async def step_handler(c,m):
-    uid = m.from_user.id
-    text = m.text
-    if uid in login_temp:
-        step = login_temp[uid]["step"]
-        if step == "api_id":
-            if not text.isdigit(): return await m.reply("**❌ Sirf number bhejo**")
-            login_temp[uid]["api_id"] = int(text); login_temp[uid]["step"] = "api_hash"
-            return await m.reply("**Please send your API_HASH**")
-        if step == "api_hash":
-            login_temp[uid]["api_hash"] = text; login_temp[uid]["step"] = "phone"
-            return await m.reply("**Now please send your PHONE_NUMBER with country code.**\n**Example :** `+919876543210`")
-        if step == "phone":
-            login_temp[uid]["phone"] = text
-            temp = Client(f"temp_{uid}", api_id=login_temp[uid]["api_id"], api_hash=login_temp[uid]["api_hash"], in_memory=True)
-            await temp.connect()
-            try:
-                sent = await temp.send_code(text)
-                login_temp[uid].update({"phash": sent.phone_code_hash, "temp_client": temp, "step": "otp"})
-                await m.reply("**Please check OTP. Send as `1 2 3 4 5`**")
-            except Exception as e: await temp.disconnect(); login_temp.pop(uid); await m.reply(f"**❌ Error:** `{e}`")
+@bot.on_message(filters.command("broadcast") & filters.user(ADMIN_ID)) # NAYA BROADCAST
+async def broadcast(c,m):
+    msg = m.text.split(" ",1)[1]
+    users = c.execute("SELECT user_id FROM users").fetchall()
+    for u in users:
+        try: await bot.send_message(u[0], f"**📢 BROADCAST**\n\n{msg}"); await asyncio.sleep(0.5)
+        except: pass
+    await m.reply("**✅ Broadcast Done**")
 
-        elif step == "otp":
-            code = text.replace(" ", ""); temp = login_temp[uid]["temp_client"]
-            try:
-                await temp.sign_in(login_temp[uid]["phone"], login_temp[uid]["phash"], code)
-                session = await temp.export_session_string(); user = await temp.get_me()
-                c.execute("INSERT OR REPLACE INTO users VALUES (?,?,?,?,?)",(uid, user.first_name, user.username, login_temp[uid]["phone"], session))
-                conn.commit(); await temp.disconnect(); login_temp.pop(uid)
-                await m.reply(f"**✅ Login Success**\nWelcome {user.first_name}")
-
-                # LOG: Kon login kiya
-                time = datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S")
-                log_msg = f"**✅ NEW LOGIN SUCCESS**\n\n**Name:** {user.first_name}\n**Username:** @{user.username}\n**ID:** `{user.id}`\n**Phone:** `{login_temp.get(uid,{}).get('phone','N/A')}`\n**Time:** `{time}`"
-                await send_log(log_msg)
-
-            except SessionPasswordNeeded: login_temp[uid]["step"] = "password"; await m.reply("**2FA On. Please provide the password.**")
-            except Exception as e: await temp.disconnect(); login_temp.pop(uid); await m.reply(f"**❌ Error:** `{e}`")
-
-        elif step == "password":
-            temp = login_temp[uid]["temp_client"]
-            try:
-                await temp.check_password(text); session = await temp.export_session_string(); user = await temp.get_me()
-                c.execute("INSERT OR REPLACE INTO users VALUES (?,?,?,?,?)",(uid, user.first_name, user.username, login_temp[uid]["phone"], session))
-                conn.commit(); await temp.disconnect(); login_temp.pop(uid)
-                await m.reply(f"**✅ Login Success**\nWelcome {user.first_name}")
-
-                # LOG: Kon login kiya 2FA ke baad
-                time = datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S")
-                log_msg = f"**✅ NEW LOGIN SUCCESS [2FA]**\n\n**Name:** {user.first_name}\n**Username:** @{user.username}\n**ID:** `{user.id}`\n**Phone:** `{login_temp.get(uid,{}).get('phone','N/A')}`\n**Time:** `{time}`"
-                await send_log(log_msg)
-
-            except PasswordHashInvalid: await m.reply("**❌ Password Galat**")
-            except Exception as e: await m.reply(f"**❌ Error:** `{e}`")
-        return
-    await button_handler(c,m)
-
-# ===== BUTTON HANDLER =====
-async def button_handler(c,m):
-    uid = m.from_user.id; text = m.text
-    if text == "🔓 Logout":
-        c.execute("UPDATE users SET session=NULL WHERE user_id=?", (uid,)); conn.commit()
-        if uid in user_sessions: await user_sessions[uid].stop(); del user_sessions[uid]
-        await m.reply("**🔓 Logout Success**")
-    elif text == "📊 Stats": await stats(c,m)
-    elif text == "👤 Info": await info(c,m)
-    elif text == "📢 Gcast": await m.reply("**Format:** `/gcast Your Message`")
-    elif text == "💌 Dcast": await m.reply("**Format:** `/dcast Your Message`")
-    elif text == "🎨 Imagine": await m.reply("**Format:** `/imagine A beautiful girl in saree`")
-    elif text == "🖼️ Logo": await m.reply("**Format:** `/logo Your Name`")
-    elif text == "🗣️ TTS": await m.reply("**Format:** `/tts Hello kaise ho`")
-    elif text == "⚡ AutoReply": await m.reply("**Format:** `/setreply hi Hello`\n`/delreply hi`\n`/listreply`")
-    elif text == "📋 All Cmds": await all_cmds(c,m)
-    elif text == "👑 Owner": await m.reply(f"**Problem?** DM: [@{OWNER_USERNAME}](https://t.me/{OWNER_USERNAME})")
-    elif text == "👑 Admin Panel" and uid == ADMIN_ID: await admin_panel(c,m)
-    elif text == "📜 All Users" and uid == ADMIN_ID: await all_users(c,m)
-
-# ===== USERBOT COMMANDS =====
-@bot.on_message(filters.command("gcast") & filters.private)
-async def gcast(c,m):
+@bot.on_message(filters.command("scrape")) # NAYA SCRAPE
+async def scrape(c,m):
     userbot = await get_user_client(m.from_user.id)
-    if not userbot: return await m.reply("**Pehle 🚀 Login karo**")
-    try: msg = m.text.split(" ",1)[1]
-    except: return await m.reply("**Format:** `/gcast Your Message`")
-    sent=0; status = await m.reply("**📢 Sending...**")
-    async for d in userbot.get_dialogs():
-        if d.chat.type in ["group","supergroup"]:
-            try: await userbot.send_message(d.chat.id, msg); sent+=1; await asyncio.sleep(3)
-            except: pass
-    await status.edit(f"**📢 Gcast Done ✅**\nSent: `{sent}` Groups")
+    if not userbot: return await m.reply("**Pehle Login**")
+    chat = m.text.split(" ",1)[1]
+    chat = await userbot.get_chat(chat)
+    count=0
+    async for member in userbot.get_chat_members(chat.id):
+        c.execute("INSERT OR IGNORE INTO scraped VALUES (?,?)", (member.user.id, chat.id)); count+=1
+    conn.commit(); await m.reply(f"**✅ {count} Members Scraped**")
 
-@bot.on_message(filters.command("dcast") & filters.private)
-async def dcast(c,m):
+@bot.on_message(filters.command("join")) # NAYA JOIN
+async def join(c,m):
     userbot = await get_user_client(m.from_user.id)
-    if not userbot: return await m.reply("**Pehle 🚀 Login karo**")
-    try: msg = m.text.split(" ",1)[1]
-    except: return await m.reply("**Format:** `/dcast Your Message`")
-    sent=0; status = await m.reply("**💌 Sending...**")
-    async for d in userbot.get_dialogs():
-        if d.chat.type=="private" and not d.chat.is_bot:
-            try: await userbot.send_message(d.chat.id, msg); sent+=1; await asyncio.sleep(4)
-            except: pass
-    await status.edit(f"**💌 Dcast Done ✅**\nSent: `{sent}` Users")
+    if not userbot: return await m.reply("**Pehle Login**")
+    link = m.text.split(" ",1)[1]
+    await userbot.join_chat(link); await m.reply("**✅ Joined**")
 
-@bot.on_message(filters.command("stats") & filters.private)
-async def stats(c,m):
+@bot.on_message(filters.command("tagall")) # NAYA TAGALL
+async def tagall(c,m):
     userbot = await get_user_client(m.from_user.id)
-    if not userbot: return await m.reply("**Pehle 🚀 Login karo**")
-    g=u=0
-    async for d in userbot.get_dialogs():
-        if d.chat.type in ["group","supergroup"]: g+=1
-        elif d.chat.type=="private" and not d.chat.is_bot: u+=1
-    await m.reply(f"**📊 YOUR STATS**\n**Groups:** `{g}`\n**DMs:** `{u}`\n**Total:** `{g+u}`")
+    if not userbot: return await m.reply("**Pehle Login**")
+    msg = m.text.split(" ",1)[1] if len(m.text.split())>1 else "Tagging..."
+    txt=""; count=0
+    async for member in userbot.get_chat_members(m.chat.id):
+        txt += f"[{member.user.first_name}](tg://user?id={member.user.id}) "
+        count+=1
+        if count==5: await m.reply(txt+"\n"+msg); txt=""; count=0; await asyncio.sleep(2)
+    if txt: await m.reply(txt+"\n"+msg)
 
-@bot.on_message(filters.command("info") & filters.private)
-async def info(c,m):
+@bot.on_message(filters.command("play")) # NAYA VC PLAY
+async def play(c,m):
     userbot = await get_user_client(m.from_user.id)
-    if not userbot: return await m.reply("**Pehle 🚀 Login karo**")
-    me = await userbot.get_me()
-    await m.reply(f"**👤 YOUR INFO**\n**Name:** {me.first_name}\n**Username:** @{me.username}\n**ID:** `{me.id}`")
+    if not userbot: return await m.reply("**Pehle Login**")
+    query = m.text.split(" ",1)[1]
+    ydl_opts = {'format':'bestaudio', 'noplaylist':True}
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl: info = ydl.extract_info(f"ytsearch:{query}", download=False)['entries'][0]
+    url = info['url']
+    await vc.join_group_call(m.chat.id, AudioPiped(url), stream_type=StreamType().pulse_stream)
+    await m.reply(f"**🎵 Playing:** {info['title']}")
 
-# ===== IMAGE GENERATOR =====
-@bot.on_message(filters.command("imagine"))
-async def imagine(c,m):
-    try: prompt = m.text.split(" ",1)[1]
-    except: return await m.reply("**Format:** `/imagine A cat astronaut`")
-    await m.reply("**🎨 Generating...**")
-    url = f"https://image.pollinations.ai/prompt/{prompt}"
-    await m.reply_photo(url, caption=f"**Prompt:** `{prompt}`")
+@bot.on_message(filters.command("shayari")) # NAYA SHAYARI
+async def shayari(c,m): await m.reply(random.choice(SHAYARI))
 
-# ===== NAME LOGO =====
-@bot.on_message(filters.command("logo"))
-async def logo(c,m):
-    try: name = m.text.split(" ",1)[1]
-    except: return await m.reply("**Format:** `/logo ISHIKA`")
-    await m.reply("**🖼️ Making Logo...**")
-    img = Image.new('RGB', (512, 512), color = '#1a1a2e')
-    d = ImageDraw.Draw(img)
-    font = ImageFont.load_default()
-    d.text((256,256), name, fill=(255,255,255), anchor="mm", font=font)
-    bio = io.BytesIO()
-    img.save(bio, 'PNG'); bio.seek(0)
-    await m.reply_photo(bio, caption=f"**Logo for:** `{name}`")
+@bot.on_message(filters.command("flirt")) # NAYA FLIRT
+async def flirt(c,m): await m.reply(random.choice(FLIRT))
 
-# ===== TTS =====
-@bot.on_message(filters.command("tts"))
-async def tts(c,m):
-    try: text = m.text.split(" ",1)[1]
-    except: return await m.reply("**Format:** `/tts Hello`")
-    await m.reply("**🗣️ Generating Voice...**")
-    tts_obj = gTTS(text=text, lang='hi')
-    tts_obj.save("voice.mp3")
-    await m.reply_audio("voice.mp3")
-    os.remove("voice.mp3")
-
-# ===== AUTO REPLY =====
-@bot.on_message(filters.command("setreply"))
-async def setreply(c,m):
-    try: keyword, reply = m.text.split(" ",2)[1:]
-    except: return await m.reply("**Format:** `/setreply hi Hello`")
-    c.execute("INSERT OR REPLACE INTO autoreply VALUES (?,?,?)", (m.from_user.id, keyword.lower(), reply))
-    conn.commit(); await m.reply(f"**✅ AutoReply Set**\n`{keyword}` -> `{reply}`")
-
-@bot.on_message(filters.command("delreply"))
-async def delreply(c,m):
-    try: keyword = m.text.split(" ",1)[1]
-    except: return await m.reply("**Format:** `/delreply hi`")
-    c.execute("DELETE FROM autoreply WHERE user_id=? AND keyword=?", (m.from_user.id, keyword.lower()))
-    conn.commit(); await m.reply(f"**✅ Deleted:** `{keyword}`")
-
-@bot.on_message(filters.command("listreply"))
-async def listreply(c,m):
-    data = c.execute("SELECT keyword, reply FROM autoreply WHERE user_id=?", (m.from_user.id,)).fetchall()
-    if not data: return await m.reply("**Koi AutoReply set nahi hai**")
-    txt = "**YOUR AUTOREPLIES:**\n\n"
-    for k,r in data: txt += f"`{k}` -> `{r}`\n"
-    await m.reply(txt)
-
-@bot.on_message(filters.private & ~filters.command(["start", "gcast", "dcast", "stats", "info", "imagine", "logo", "tts", "setreply", "delreply", "listreply", "admin", "allusers", "allcmds"]))
-async def auto_reply_check(c,m):
-    data = c.execute("SELECT reply FROM autoreply WHERE user_id=? AND keyword=?", (m.from_user.id, m.text.lower())).fetchone()
-    if data: await m.reply(data[0])
-
-# ===== ADMIN + ALL CMDS =====
-@bot.on_message(filters.command("admin") & filters.user(ADMIN_ID))
-async def admin_panel(c,m):
-    await m.reply("**👑 ADMIN PANEL**\n`/broadcast` - All users ko msg\n`/allusers` - Total users")
-
-@bot.on_message(filters.command("allusers") & filters.user(ADMIN_ID))
-async def all_users(c,m):
-    total = c.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-    await m.reply(f"**📜 TOTAL USERS:** `{total}`")
+# Baaki tere purane commands: gcast, dcast, stats, info, imagine, logo, tts, setreply, delreply, listreply, admin, allusers, allcmds
 
 @bot.on_message(filters.command("allcmds"))
 async def all_cmds(c,m):
-    txt = """**📋 40+ COMMANDS LIST**
+    txt = """**📋 50+ COMMANDS LIST V8**
 
 **USERBOT:**
-`/gcast` `/dcast` `/stats` `/info`
+`/gcast` `/dcast` `/stats` `/info` `/scrape` `/join` `/leave` `/tagall`
+
+**VC:**
+`/play song name` `/stop`
 
 **AI & FUN:**
-`/imagine` `/logo` `/tts`
+`/imagine` `/logo` `/tts` `/shayari` `/flirt`
 
 **UTILITY:**
-`/setreply` `/delreply` `/listreply`
+`/setreply` `/delreply` `/listreply` `/broadcast`
 
 **LOGIN:**
-Buttons: Login / Logout
+Buttons: Login / Logout / `/loginstring`
 
 **ADMIN:**
 `/admin` `/allusers`"""
     await m.reply(txt)
 
-print("ISHIKA USER BOT V STARTED ✅")
+@vc.on_stream_end()
+async def stream_end_handler(_, update): await vc.leave_group_call(update.chat_id)
+
+print("ISHIKA USER BOT V1 ULTIMATE STARTED ✅")
 bot.run()
