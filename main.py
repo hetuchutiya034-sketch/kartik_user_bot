@@ -188,3 +188,73 @@ async def purge(client, message: Message):
 
 print("Userbot Started!")
 app.run()
+
+# /broadcast command - DM + Groups dono me
+@app.on_message(filters.me & filters.command("broadcast"))
+async def broadcast(client, message: Message):
+    if len(message.command) < 2:
+        return await message.edit("Use: `/broadcast your message`")
+    
+    msg = " ".join(message.command[1:])
+    await message.edit("📢 **Broadcast Starting...**")
+    
+    sent = 0
+    failed = 0
+    
+    async for dialog in client.get_dialogs():
+        if dialog.chat.type in ["private", "group", "supergroup"]:
+            try:
+                await client.send_message(dialog.chat.id, f"📢 **Broadcast**\n\n{msg}")
+                sent += 1
+                await asyncio.sleep(3) # spam se bachne ke liye
+                
+            except FloodWait as e:
+                await asyncio.sleep(e.value)
+            except:
+                failed += 1
+    
+    await message.reply(f"**Broadcast Complete** ✅\n**Sent:** `{sent}` chats\n**Failed:** `{failed}` chats")
+
+# /gcast - sirf groups me
+@app.on_message(filters.me & filters.command("gcast"))
+async def gcast(client, message: Message):
+    if len(message.command) < 2:
+        return await message.edit("Use: `/gcast your message`")
+    
+    msg = " ".join(message.command[1:])
+    await message.edit("📢 **Group Broadcast Starting...**")
+    
+    sent = 0
+    async for dialog in client.get_dialogs():
+        if dialog.chat.type in ["group", "supergroup"]:
+            try:
+                await client.send_message(dialog.chat.id, f"📢 **Group Broadcast**\n\n{msg}")
+                sent += 1
+                await asyncio.sleep(3)
+                
+            except:
+                pass
+    
+    await message.reply(f"**Group Broadcast Complete** ✅\n**Sent:** `{sent}` groups")
+
+# /dcast - sirf DM me
+@app.on_message(filters.me & filters.command("dcast"))
+async def dcast(client, message: Message):
+    if len(message.command) < 2:
+        return await message.edit("Use: `/dcast your message`")
+    
+    msg = " ".join(message.command[1:])
+    await message.edit("📢 **DM Broadcast Starting...**")
+    
+    sent = 0
+    async for dialog in client.get_dialogs():
+        if dialog.chat.type == "private" and not dialog.chat.is_bot:
+            try:
+                await client.send_message(dialog.chat.id, f"📢 **Message**\n\n{msg}")
+                sent += 1
+                await asyncio.sleep(3)
+                
+            except:
+                pass
+    
+    await message.reply(f"**DM Broadcast Complete** ✅\n**Sent:** `{sent}` users")
