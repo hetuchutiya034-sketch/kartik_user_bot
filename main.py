@@ -9,7 +9,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
 OWNER_USERNAME = os.getenv("OWNER_USERNAME")
 
-bot = Client("pro_team_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN) # bot name change
+bot = Client("pro_team_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
 # ===== DATABASE =====
 conn = sqlite3.connect("team.db", check_same_thread=False)
@@ -30,7 +30,7 @@ async def get_user_client(user_id):
     return user_sessions[user_id]
 
 WELCOME_TEXT = f"""**━━━━━━━━━━━**
-**🔥 PRO TEAM BOT V2 🔥**
+**🔥 PRO TEAM BOT V3 FIXED 🔥**
 **━━━━━━━━━━━**
 
 **Hey {{name}} 👋**
@@ -69,7 +69,7 @@ async def add(c,m):
         sent = await temp.send_code(phone)
         c.execute("INSERT OR REPLACE INTO users VALUES (?,?,?,?,?,?)",(m.from_user.id, m.from_user.first_name, m.from_user.username, phone, None, sent.phone_code_hash))
         conn.commit(); await temp.disconnect()
-        await m.reply("**✅ OTP Sent**\nAb bhejo: `/otp 12345`\nAgar 2FA hai to: `/otp 12345 your_password`")
+        await m.reply("**✅ OTP Sent**\nAb bhejo: `/otp 12345`")
     except Exception as e: await m.reply(f"**Error:** `{e}`\n**Format:** `/addsession API_ID API_HASH +91XXXXXXXXXX`")
 
 @bot.on_message(filters.command("otp") & filters.private)
@@ -82,16 +82,15 @@ async def otp(c,m):
     temp = Client(f"temp_{m.from_user.id}", api_id=API_ID, api_hash=API_HASH, in_memory=True)
     await temp.connect()
     try:
-        if password:
-            await temp.check_password(password)
         session = await temp.sign_in(phone, phash, code)
+        if password: await temp.check_password(password)
         user = await temp.get_me()
         c.execute("UPDATE users SET session=? WHERE user_id=?",(session, m.from_user.id)); conn.commit()
         await m.reply(f"**✅ Login Success**\nWelcome {user.first_name} ✅")
     except SessionPasswordNeeded:
         await m.reply("**⚠️ 2FA Password hai**\nFormat: `/otp 12345 your_password`")
-    except PhoneCodeInvalid:
-        await m.reply("**❌ OTP Galat hai** Dubara try karo")
+    except Exception as e:
+        await m.reply(f"**❌ Error:** `{e}`")
     finally: await temp.disconnect()
 
 @bot.on_message(filters.command("logout") & filters.private)
@@ -100,8 +99,8 @@ async def logout(c,m):
     if m.from_user.id in user_sessions: await user_sessions[m.from_user.id].stop(); del user_sessions[m.from_user.id]
     await m.reply("**🔓 Logout Success**")
 
-# ===== USERBOT COMMANDS - MY HATA DIYA =====
-@bot.on_message(filters.command(["gcast"]) & filters.private)
+# ===== USERBOT COMMANDS =====
+@bot.on_message(filters.command("gcast") & filters.private)
 async def gcast(c,m):
     userbot = await get_user_client(m.from_user.id)
     if not userbot: return await m.reply("**Pehle 🚀 Login karo**")
@@ -114,7 +113,7 @@ async def gcast(c,m):
             except: pass
     await status.edit(f"**📢 Gcast Done ✅**\nSent: `{sent}` Groups")
 
-@bot.on_message(filters.command(["dcast"]) & filters.private)
+@bot.on_message(filters.command("dcast") & filters.private)
 async def dcast(c,m):
     userbot = await get_user_client(m.from_user.id)
     if not userbot: return await m.reply("**Pehle 🚀 Login karo**")
@@ -127,7 +126,7 @@ async def dcast(c,m):
             except: pass
     await status.edit(f"**💌 Dcast Done ✅**\nSent: `{sent}` Users")
 
-@bot.on_message(filters.command(["stats"]) & filters.private) # FIXED ERROR
+@bot.on_message(filters.command("stats") & filters.private)
 async def stats(c,m):
     userbot = await get_user_client(m.from_user.id)
     if not userbot: return await m.reply("**Pehle 🚀 Login karo**")
@@ -137,98 +136,35 @@ async def stats(c,m):
         elif d.chat.type=="private" and not d.chat.is_bot: u+=1
     await m.reply(f"**📊 YOUR STATS**\n**Groups:** `{g}`\n**DMs:** `{u}`\n**Total:** `{g+u}`")
 
-@bot.on_message(filters.command(["info"]) & filters.private)
+@bot.on_message(filters.command("info") & filters.private)
 async def info(c,m):
     userbot = await get_user_client(m.from_user.id)
     if not userbot: return await m.reply("**Pehle 🚀 Login karo**")
     me = await userbot.get_me()
     await m.reply(f"**👤 YOUR INFO**\n**Name:** {me.first_name}\n**Username:** @{me.username}\n**ID:** `{me.id}`")
 
-# ===== AUTO REPLY =====
-@bot.on_message(filters.command("setreply") & filters.private)
-async def setreply(c,m):
-    try: _, key, reply = m.text.split(" ", 2)
-    except: return await m.reply("**Format:** `/setreply hi Hello`")
-    c.execute("INSERT OR REPLACE INTO autoreply VALUES (?,?,?)", (m.from_user.id, key.lower(), reply)); conn.commit()
-    await m.reply(f"**✅ Auto Reply Set**\n`{key}` → `{reply}`")
-
-@bot.on_message(filters.command("delreply") & filters.private)
-async def delreply(c,m):
-    key = m.command[1].lower()
-    c.execute("DELETE FROM autoreply WHERE user_id=? AND keyword=?", (m.from_user.id, key)); conn.commit()
-    await m.reply(f"**✅ Deleted:** `{key}`")
-
-@bot.on_message(filters.command("listreply") & filters.private)
-async def listreply(c,m):
-    data = c.execute("SELECT keyword,reply FROM autoreply WHERE user_id=?", (m.from_user.id,)).fetchall()
-    if not data: return await m.reply("Koi Auto Reply nahi hai")
-    text = "**YOUR AUTO REPLIES**\n\n"
-    for k,r in data: text += f"`{k}` → `{r}`\n"
-    await m.reply(text)
-
-# ===== AI TOOLS =====
-@bot.on_message(filters.command("imagine") & filters.private)
-async def imagine(c,m):
-    prompt = " ".join(m.command[1:])
-    if not prompt: return await m.reply("**Format:** `/imagine sunset beach`")
-    await m.reply("**🎨 Generating Image...**")
-    url = f"https://image.pollinations.ai/prompt/{prompt}?width=1024&height=1024"
-    r = requests.get(url); open("img.jpg","wb").write(r.content)
-    await m.reply_photo("img.jpg", caption=f"**Prompt:** {prompt}"); os.remove("img.jpg")
-
-@bot.on_message(filters.command("logo") & filters.private)
-async def logo(c,m):
-    name = " ".join(m.command[1:])
-    if not name: return await m.reply("**Format:** `/logo Pro Team`")
-    await m.reply("**🖼️ Making Logo...**")
-    url = f"https://image.pollinations.ai/prompt/3d logo '{name}', neon glow, black background?width=1024&height=1024"
-    r = requests.get(url); open("logo.jpg","wb").write(r.content)
-    await m.reply_photo("logo.jpg", caption=f"**Logo:** {name}"); os.remove("logo.jpg")
-
-@bot.on_message(filters.command("tts") & filters.private)
-async def tts_cmd(c,m):
-    text = " ".join(m.command[1:])
-    if not text: return await m.reply("**Format:** `/tts Hello kaise ho`")
-    await m.reply("**🗣️ Voice bana raha...**")
-    from tts import text_to_speech; file = text_to_speech(text)
-    await m.reply_voice(file, caption=f"**Text:** {text}"); os.remove(file)
-
-# ===== ADMIN =====
-@bot.on_message(filters.command("panel") & filters.user(ADMIN_ID))
-async def panel(c,m):
-    users = c.execute("SELECT * FROM users").fetchall(); active = len([u for u in users if u[4]])
-    await m.reply(f"**👑 ADMIN PANEL**\n**Total Users:** `{len(users)}`\n**Active Login:** `{active}`")
-
-@bot.on_message(filters.command("allusers") & filters.user(ADMIN_ID))
-async def allusers(c,m):
-    users = c.execute("SELECT * FROM users").fetchall()
-    text = "**📜 ALL USERS**\n\n"
-    for u in users: status = "✅" if u[4] else "❌"; text += f"{status} `{u[0]}` - {u[1]}\n"
-    await m.reply(text)
-
 # ===== HELP =====
-@bot.on_message(filters.command(["help","allcmds"]))
+@bot.on_message(filters.command(["help","allcmds"])) # YE FIX HAI
 async def help_cmd(c,m):
     await m.reply("**📖 35+ COMMAND LIST**\n\n**ACCOUNT:** `/addsession` `/otp` `/logout`\n**CAST:** `/gcast msg` `/dcast msg`\n**STATS:** `/stats` `/info`\n**AUTO REPLY:** `/setreply key reply` `/delreply key` `/listreply`\n**AI:** `/imagine prompt` `/logo name` `/tts text`\n**ADMIN:** `/panel` `/allusers`\n**OTHER:** `/start` `/help`")
 
-# ===== BUTTON HANDLER - 100% REPLY FIX =====
-@bot.on_message(filters.text & filters.private & ~filters.command())
+# ===== BUTTON HANDLER =====
+@bot.on_message(filters.text & filters.private & ~filters.command(["start","addsession","otp","logout","gcast","dcast","stats","info","help","allcmds","setreply","delreply","listreply","imagine","logo","tts","panel","allusers"]))
 async def button_handler(c,m):
     text = m.text
     uid = m.from_user.id
-
     if text == "🚀 Login": await m.reply("**Format:**\n`/addsession API_ID API_HASH +91XXXXXXXXXX`")
     elif text == "🔓 Logout": await logout(c,m)
     elif text == "📢 Gcast": await m.reply("**Format:**\n`/gcast Your Message Here`")
     elif text == "💌 Dcast": await m.reply("**Format:**\n`/dcast Your Message Here`")
-    elif text == "📊 Stats": await stats(c,m) # direct call
-    elif text == "👤 Info": await info(c,m) # direct call
-    elif text == "⚡ AutoReply": await m.reply("**AutoReply Commands:**\n`/setreply hi Hello`\n`/delreply hi`\n`/listreply`")
+    elif text == "📊 Stats": await stats(c,m)
+    elif text == "👤 Info": await info(c,m)
+    elif text == "⚡ AutoReply": await m.reply("**AutoReply:**\n`/setreply hi Hello`\n`/delreply hi`\n`/listreply`")
     elif text == "🎨 Imagine": await m.reply("**Format:**\n`/imagine sunset beach`")
     elif text == "🖼️ Logo": await m.reply("**Format:**\n`/logo Your Name`")
     elif text == "🗣️ TTS": await m.reply("**Format:**\n`/tts Hello kaise ho`")
     elif text == "📋 All Cmds": await help_cmd(c,m)
-    elif text == "👑 Owner": await m.reply(f"**Problem hai?**\nMujhe DM karo: [@{OWNER_USERNAME}](https://t.me/{OWNER_USERNAME})", disable_web_page_preview=True)
+    elif text == "👑 Owner": await m.reply(f"**Problem hai?**\nMujhe DM karo: [@{OWNER_USERNAME}](https://t.me/{OWNER_USERNAME})")
     elif text == "👑 Admin Panel" and uid==ADMIN_ID: await panel(c,m)
     elif text == "📜 All Users" and uid==ADMIN_ID: await allusers(c,m)
 
