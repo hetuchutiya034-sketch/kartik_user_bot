@@ -236,7 +236,7 @@ async def listreply(c,m):
     await m.reply(txt)
 
 # Auto reply trigger
-@bot.on_message(filters.private & ~filters.command())
+@bot.on_message(filters.private & ~filters.command(["start", "login", "logout", "gcast", "dcast", "stats", "info", "imagine", "logo", "tts", "setreply", "delreply", "listreply", "admin", "allusers", "allcmds"]))
 async def auto_reply_check(c,m):
     data = c.execute("SELECT reply FROM autoreply WHERE user_id=? AND keyword=?", (m.from_user.id, m.text.lower())).fetchone()
     if data: await m.reply(data[0])
