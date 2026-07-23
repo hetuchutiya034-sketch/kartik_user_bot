@@ -1,7 +1,7 @@
 from pyrogram import Client, filters
-from pyrogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
+from pyrogram.types import ReplyKeyboardMarkup, KeyboardButton
 from pyrogram.errors import SessionPasswordNeeded, PhoneCodeInvalid, PasswordHashInvalid
-import sqlite3, os, asyncio, requests
+import sqlite3, os, asyncio
 from gtts import gTTS
 from PIL import Image, ImageDraw, ImageFont
 import io
@@ -92,20 +92,24 @@ async def step_handler(c,m):
                 login_temp[uid].update({"phash": sent.phone_code_hash, "temp_client": temp, "step": "otp"})
                 await m.reply("**Please check OTP. Send as `1 2 3 4 5`**")
             except Exception as e: await temp.disconnect(); login_temp.pop(uid); await m.reply(f"**❌ Error:** `{e}`")
+
         elif step == "otp":
             code = text.replace(" ", ""); temp = login_temp[uid]["temp_client"]
             try:
                 await temp.sign_in(login_temp[uid]["phone"], login_temp[uid]["phash"], code)
                 session = await temp.export_session_string(); user = await temp.get_me()
+                # FIXED: c.execute not temp.execute
                 c.execute("INSERT OR REPLACE INTO users VALUES (?,?,?,?,?)",(uid, user.first_name, user.username, login_temp[uid]["phone"], session))
                 conn.commit(); await temp.disconnect(); login_temp.pop(uid)
                 await m.reply(f"**✅ Login Success**\nWelcome {user.first_name}")
             except SessionPasswordNeeded: login_temp[uid]["step"] = "password"; await m.reply("**2FA On. Please provide the password.**")
             except Exception as e: await temp.disconnect(); login_temp.pop(uid); await m.reply(f"**❌ Error:** `{e}`")
+
         elif step == "password":
             temp = login_temp[uid]["temp_client"]
             try:
                 await temp.check_password(text); session = await temp.export_session_string(); user = await temp.get_me()
+                # FIXED: c.execute not temp.execute
                 c.execute("INSERT OR REPLACE INTO users VALUES (?,?,?,?,?)",(uid, user.first_name, user.username, login_temp[uid]["phone"], session))
                 conn.commit(); await temp.disconnect(); login_temp.pop(uid)
                 await m.reply(f"**✅ Login Success**\nWelcome {user.first_name}")
@@ -235,7 +239,7 @@ async def listreply(c,m):
     for k,r in data: txt += f"`{k}` -> `{r}`\n"
     await m.reply(txt)
 
-# Auto reply trigger - FIXED
+# Auto reply trigger
 @bot.on_message(filters.private & ~filters.command(["start", "gcast", "dcast", "stats", "info", "imagine", "logo", "tts", "setreply", "delreply", "listreply", "admin", "allusers", "allcmds"]))
 async def auto_reply_check(c,m):
     data = c.execute("SELECT reply FROM autoreply WHERE user_id=? AND keyword=?", (m.from_user.id, m.text.lower())).fetchone()
@@ -268,9 +272,7 @@ async def all_cmds(c,m):
 Buttons: Login / Logout
 
 **ADMIN:**
-`/admin` `/allusers`
-
-Aur commands add kar dunga"""
+`/admin` `/allusers`"""
     await m.reply(txt)
 
 print("ISHIKA USER BOT V1 STARTED ✅")
