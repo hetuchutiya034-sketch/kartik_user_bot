@@ -1,271 +1,262 @@
 from pyrogram import Client, filters
-from pyrogram.types import Message, ChatPrivileges
-from pyrogram.errors import FloodWait, UserAdminInvalid
-import asyncio
-import os
-from gtts import gTTS # TTS ke liye
+from pyrogram.types import ReplyKeyboardMarkup, KeyboardButton
+import sqlite3, os, asyncio, datetime, requests
 
-API_ID = int(os.getenv("API_ID"))
-API_HASH = os.getenv("API_HASH")
-SESSION = os.getenv("SESSION")
+# ===== CONFIG - RAILWAY VARIABLES ME DAALNA =====
+API_ID = int(os.getenv("API_ID", "123456"))
+API_HASH = os.getenv("API_HASH", "tera_api_hash")
+BOT_TOKEN = os.getenv("BOT_TOKEN", "bot_token_yaha")
+ADMIN_ID = int(os.getenv("ADMIN_ID", "12345678"))
+OWNER_USERNAME = os.getenv("OWNER_USERNAME", "tera_username")
 
-app = Client("userbot", api_id=API_ID, api_hash=API_HASH, session_string=SESSION)
+app = Client("pro_team_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
-tagging = False
+# ===== DATABASE =====
+conn = sqlite3.connect("team.db", check_same_thread=False)
+c = conn.cursor()
+c.execute("CREATE TABLE IF NOT EXISTS users (user_id INTEGER PRIMARY KEY, name TEXT, username TEXT, phone TEXT, session TEXT, login_time TEXT)")
+c.execute("CREATE TABLE IF NOT EXISTS autoreply (user_id INTEGER, keyword TEXT, reply TEXT)")
+conn.commit()
 
-# /ping
-@app.on_message(filters.me & filters.command("ping"))
-async def ping(client, message: Message):
-    await message.edit("🏓 Pong! Bot zinda hai")
+user_sessions = {}
 
-# /help - TTS ADD KIYA
-@app.on_message(filters.me & filters.command("help"))
-async def help(client, message: Message):
-    text = """**🔥 Ishika Userbot Commands 🔥**
+def get_user_client(user_id, session_string):
+    if user_id not in user_sessions:
+        client = Client(f"session_{user_id}", api_id=API_ID, api_hash=API_HASH, session_string=session_string, in_memory=True)
+        client.start()
+        user_sessions[user_id] = client
+    return user_sessions[user_id]
 
-**Tag wale:**
-`/tagall message` - Ek ek karke sabko tag
-`/cancel` - Tagging rok de
+# ===== FANCY WELCOME =====
+WELCOME_TEXT = f"""**━━━━━━━━━━━━━━━━━━━**
+**🔥 WELCOME TO PRO TEAM BOT 🔥**
+**━━━━━━━━━━━**
 
-**Admin wale:**
-`/promote` - Reply karke admin bana
-`/demote` - Reply karke admin hata  
-`/ban` - Reply karke ban
-`/unban` - Reply karke unban
-`/mute` - Reply karke mute
-`/unmute` - Reply karke unmute
+**Hey {{name}} 👋**
 
-**Info wale:**
-`/id` - Chat aur User ID
-`/info` - Reply karke user info
-`/purge` - Reply se niche sab delete
+Ye bot tumhare **Personal Telegram Account** se kaam karega.
 
-**Broadcast wale:**
-`/broadcast msg` - Sabko DM + Group
-`/gcast msg` - Sirf Groups me
-`/dcast msg` - Sirf DM me
+**⚡ FEATURES ⚡**
+- `📢 Gcast` - 1 Click me sab Group me msg
+- `💌 Dcast` - 1 Click me sab DM me msg
+- `⚡ Auto Reply` - Keyword pe auto reply
+- `📊 Live Stats` - Groups + DM count
+- `🎨 Imagine` - AI se image banao
+- `🖼️ Logo Maker` - Apne naam ka logo
 
-**TTS wala:**
-`/tts text` - Text ko voice me convert
+**📝 RULES**
+1. Pehle `🚀 Login` button se account add karo
+2. Spam mat karna warna Telegram ban karega
+3. Koi problem ho to `👑 Owner` se contact karo
 
-Made with 💜"""
-    await message.edit(text)
+**━━━━━━━━━━━**
+**Made with ❤️ by @{OWNER_USERNAME}**
+**━━━━━━━━━━━━━━━━━━━**
+"""
 
-# /tts NEW COMMAND
-@app.on_message(filters.me & filters.command("tts"))
-async def tts_cmd(client, message: Message):
-    if len(message.command) < 2:
-        return await message.edit("Use: `/tts hello kaise ho`")
-    
-    text = " ".join(message.command[1:])
-    await message.edit("🎤 **Voice bana raha hu...**")
-    
+# ===== /START =====
+@app.on_message(filters.command("start"))
+async def start(c,m):
+    uid = m.from_user.id
+    name = m.from_user.first_name
+
+    buttons = [
+        [KeyboardButton("🚀 Login"), KeyboardButton("🔓 Logout")],
+        [KeyboardButton("📢 My Gcast"), KeyboardButton("💌 My Dcast")],
+        [KeyboardButton("📊 My Stats"), KeyboardButton("⚡ Auto Reply")],
+        [KeyboardButton("🎨 Imagine"), KeyboardButton("🖼️ Logo")],
+        [KeyboardButton("❓ Help"), KeyboardButton("👑 Owner Support")]
+    ]
+    if uid == ADMIN_ID:
+        buttons.append([KeyboardButton("👑 Admin Panel"), KeyboardButton("📜 All Users"), KeyboardButton("📢 Broadcast")])
+
+    await m.reply(WELCOME_TEXT.format(name=name), reply_markup=ReplyKeyboardMarkup(buttons, resize_keyboard=True))
+
+# ===== BUTTON HANDLER =====
+@app.on_message(filters.text & filters.private)
+async def button_handler(c,m):
+    text = m.text
+    uid = m.from_user.id
+
+    if text == "🚀 Login": await m.reply("**Format:**\n`/addsession API_ID API_HASH +91XXXXXXXXXX`")
+    elif text == "🔓 Logout": await logout(c,m)
+    elif text == "📢 My Gcast": await m.reply("**Format:**\n`/mygcast Your Message`")
+    elif text == "💌 My Dcast": await m.reply("**Format:**\n`/mydcast Your Message`")
+    elif text == "📊 My Stats": await mystats(c,m)
+    elif text == "⚡ Auto Reply": await m.reply("`/setreply hi Hello`\n`/delreply hi`\n`/listreply`")
+    elif text == "🎨 Imagine": await m.reply("**Format:**\n`/imagine sunset beach`")
+    elif text == "🖼️ Logo": await m.reply("**Format:**\n`/logo Your Name`")
+    elif text == "❓ Help": await help_cmd(c,m)
+    elif text == "👑 Owner Support": await m.reply(f"**Problem hai?**\nMujhe DM karo: [@{OWNER_USERNAME}](https://t.me/{OWNER_USERNAME})", disable_web_page_preview=True)
+    elif text == "👑 Admin Panel":
+        if uid==ADMIN_ID: await panel(c,m)
+    elif text == "📜 All Users":
+        if uid==ADMIN_ID: await allusers(c,m)
+    elif text == "📢 Broadcast":
+        if uid==ADMIN_ID: await m.reply("**Format:**\n`/broadcast Your Message`")
+
+# ===== LOGIN / OTP / LOGOUT =====
+@app.on_message(filters.command("addsession") & filters.private)
+async def add(c,m):
     try:
-        tts = gTTS(text=text, lang='hi') # 'hi' = Hindi, 'en' = English
-        tts.save("voice.ogg")
-        
-        await client.send_voice(message.chat.id, "voice.ogg", caption=f"**TTS:** {text}")
-        await message.delete()
-        os.remove("voice.ogg") # file delete
-        
-    except Exception as e:
-        await message.edit(f"Error: `{e}`")
+        _, api_id, api_hash, phone = m.text.split(" ", 3)
+        temp = Client(f"temp_{m.from_user.id}", api_id=api_id, api_hash=api_hash, in_memory=True)
+        await temp.connect()
+        sent = await temp.send_code(phone)
+        await m.reply("**✅ OTP Sent**\nAb `/otp 12345` bhejo")
+        c.execute("INSERT OR REPLACE INTO users (user_id, name, username, phone, session) VALUES (?,?,?,?,?)",
+        (m.from_user.id, m.from_user.first_name, m.from_user.username, phone, sent.phone_code_hash))
+        conn.commit()
+        await temp.disconnect()
+    except: await m.reply("**Format:** `/addsession API_ID API_HASH +91XXXXXXXXXX`")
 
-# /tagall - ek karke
-@app.on_message(filters.me & filters.command("tagall"))
-async def tagall(client, message: Message):
-    global tagging
-    if len(message.command) < 2:
-        await message.edit("Use: `/tagall message`")
-        return
-    
-    tagging = True
-    msg = " ".join(message.command[1:])
-    await message.delete()
-    
-    members = []
-    async for member in client.get_chat_members(message.chat.id):
-        if member.user and not member.user.is_bot and not member.user.is_deleted:
-            members.append(member.user)
-    
-    count = 0
-    for user in members:
-        if not tagging: 
-            await message.reply("**Tagging Stopped** ❌")
-            break
-            
-        try:
-            await client.send_message(
-                message.chat.id, 
-                f"[{user.first_name}](tg://user?id={user.id}) {msg}"
-            )
-            count += 1
-            await asyncio.sleep(5)
-            
-        except FloodWait as e:
-            await asyncio.sleep(e.value)
-        except:
-            pass
-    
-    if tagging:
-        await message.reply(f"**Tagging Complete** ✅\nTotal: `{count}` members")
-    tagging = False
+@app.on_message(filters.command("otp") & filters.private)
+async def otp(c,m):
+    data = c.execute("SELECT * FROM users WHERE user_id=?", (m.from_user.id,)).fetchone()
+    if not data: return await m.reply("Pehle `/addsession` karo")
+    code = m.command[1]; phone, phash = data[3], data[5]
+    temp = Client(f"temp_{m.from_user.id}", api_id=API_ID, api_hash=API_HASH, in_memory=True)
+    await temp.connect()
+    session = await temp.sign_in(phone, phash, code)
+    user = await temp.get_me()
+    login_time = datetime.datetime.now().strftime("%d-%m-%Y %H:%M")
+    c.execute("UPDATE users SET session=?, name=?, username=?, login_time=? WHERE user_id=?",(session, user.first_name, user.username, login_time, m.from_user.id))
+    conn.commit()
+    await m.reply(f"**✅ Login Success**\n**Name:** {user.first_name}\nAb bot use karo")
+    await temp.disconnect()
 
-# /cancel
-@app.on_message(filters.me & filters.command("cancel"))
-async def cancel_tag(client, message: Message):
-    global tagging
-    tagging = False
-    await message.edit("**Tagging Cancelled**")
+@app.on_message(filters.command("logout") & filters.private)
+async def logout(c,m):
+    c.execute("UPDATE users SET session=NULL WHERE user_id=?", (m.from_user.id,))
+    conn.commit()
+    if m.from_user.id in user_sessions: del user_sessions[m.from_user.id]
+    await m.reply("**🔓 Logout Success**")
 
-# /promote
-@app.on_message(filters.me & filters.command("promote"))
-async def promote(client, message: Message):
-    if not message.reply_to_message:
-        return await message.edit("Reply karke use kar")
+# ===== USERBOT GCAST / DCAST / STATS =====
+@app.on_message(filters.command("mygcast") & filters.private)
+async def mygcast(c,m):
+    data = c.execute("SELECT session FROM users WHERE user_id=?", (m.from_user.id,)).fetchone()
+    if not data or not data[0]: return await m.reply("Pehle `🚀 Login` karo")
+    userbot = get_user_client(m.from_user.id, data[0])
+    msg = m.text.split(" ",1)[1]; sent=0
+    status = await m.reply("**Sending...**")
+    async for d in userbot.get_dialogs():
+        if d.chat.type in ["group","supergroup"]:
+            try: await userbot.send_message(d.chat.id, msg); sent+=1; await asyncio.sleep(3)
+            except: pass
+    await status.edit(f"**📢 Gcast Done ✅**\nSent: `{sent}` Groups")
+
+@app.on_message(filters.command("mydcast") & filters.private)
+async def mydcast(c,m):
+    data = c.execute("SELECT session FROM users WHERE user_id=?", (m.from_user.id,)).fetchone()
+    if not data or not data[0]: return await m.reply("Pehle `🚀 Login` karo")
+    userbot = get_user_client(m.from_user.id, data[0])
+    msg = m.text.split(" ",1)[1]; sent=0
+    status = await m.reply("**Sending...**")
+    async for d in userbot.get_dialogs():
+        if d.chat.type=="private" and not d.chat.is_bot:
+            try: await userbot.send_message(d.chat.id, msg); sent+=1; await asyncio.sleep(3)
+            except: pass
+    await status.edit(f"**💌 Dcast Done ✅**\nSent: `{sent}` DMs")
+
+@app.on_message(filters.command("mystats") & filters.private)
+async def mystats(c,m):
+    data = c.execute("SELECT session FROM users WHERE user_id=?", (m.from_user.id,)).fetchone()
+    if not data or not data[0]: return await m.reply("Pehle `🚀 Login` karo")
+    userbot = get_user_client(m.from_user.id, data[0])
+    g=u=0
+    async for d in userbot.get_dialogs():
+        if d.chat.type in ["group","supergroup"]: g+=1
+        elif d.chat.type=="private" and not d.chat.is_bot: u+=1
+    await m.reply(f"**📊 YOUR STATS**\n\n**Groups:** `{g}`\n**DMs:** `{u}`\n**Total:** `{g+u}`")
+
+# ===== AUTO REPLY =====
+@app.on_message(filters.command("setreply") & filters.private)
+async def setreply(c,m):
     try:
-        await client.promote_chat_member(
-            message.chat.id, message.reply_to_message.from_user.id,
-            privileges=ChatPrivileges(can_manage_chat=True, can_delete_messages=True, can_manage_video_chats=True, can_restrict_members=True, can_promote_members=False, can_change_info=True, can_invite_users=True, can_pin_messages=True)
-        )
-        await message.edit("✅ Promote kar diya")
-    except UserAdminInvalid:
-        await message.edit("Tu admin nahi hai ya rights nahi hai")
+        _, key, reply = m.text.split(" ", 2)
+        c.execute("INSERT INTO autoreply VALUES (?,?,?)", (m.from_user.id, key.lower(), reply))
+        conn.commit()
+        await m.reply(f"**✅ Auto Reply Set**\nKeyword: `{key}`")
+    except: await m.reply("Format: `/setreply hi Hello`")
 
-# /demote
-@app.on_message(filters.me & filters.command("demote"))
-async def demote(client, message: Message):
-    if not message.reply_to_message:
-        return await message.edit("Reply karke use kar")
+@app.on_message(filters.command("delreply") & filters.private)
+async def delreply(c,m):
+    key = m.command[1].lower()
+    c.execute("DELETE FROM autoreply WHERE user_id=? AND keyword=?", (m.from_user.id, key))
+    conn.commit()
+    await m.reply(f"**✅ Deleted:** `{key}`")
+
+@app.on_message(filters.command("listreply") & filters.private)
+async def listreply(c,m):
+    data = c.execute("SELECT keyword,reply FROM autoreply WHERE user_id=?", (m.from_user.id,)).fetchall()
+    if not data: return await m.reply("Koi Auto Reply nahi hai")
+    text = "**YOUR AUTO REPLIES**\n\n"
+    for k,r in data: text += f"`{k}` → `{r}`\n"
+    await m.reply(text)
+
+# ===== IMAGE + LOGO =====
+@app.on_message(filters.command("imagine") & filters.private)
+async def imagine(c,m):
+    if len(m.command) < 2: return await m.reply("**Format:** `/imagine ai robot`")
+    prompt = " ".join(m.command[1:])
+    await m.reply("**🎨 Generating... 10 sec wait**")
     try:
-        await client.promote_chat_member(message.chat.id, message.reply_to_message.from_user.id, privileges=ChatPrivileges())
-        await message.edit("✅ Demote kar diya")
-    except:
-        await message.edit("Error aa gaya")
+        url = f"https://image.pollinations.ai/prompt/{prompt}?width=1024&height=1024"
+        r = requests.get(url)
+        with open("img.jpg", "wb") as f: f.write(r.content)
+        await m.reply_photo("img.jpg", caption=f"**Prompt:** {prompt}")
+        os.remove("img.jpg")
+    except: await m.reply("Error generating image")
 
-# /ban /unban /mute /unmute
-@app.on_message(filters.me & filters.command("ban"))
-async def ban(client, message: Message):
-    if message.reply_to_message:
-        await client.ban_chat_member(message.chat.id, message.reply_to_message.from_user.id)
-        await message.edit("✅ Banned")
-        
-@app.on_message(filters.me & filters.command("unban"))
-async def unban(client, message: Message):
-    if message.reply_to_message:
-        await client.unban_chat_member(message.chat.id, message.reply_to_message.from_user.id)
-        await message.edit("✅ Unbanned")
+@app.on_message(filters.command("logo") & filters.private)
+async def logo(c,m):
+    if len(m.command) < 2: return await m.reply("**Format:** `/logo PRO KING`")
+    name = " ".join(m.command[1:])
+    await m.reply("**🖼️ Making Logo...**")
+    try:
+        url = f"https://image.pollinations.ai/prompt/3d glossy logo text '{name}', neon glow, black background, professional logo design?width=1024&height=1024"
+        r = requests.get(url)
+        with open("logo.jpg", "wb") as f: f.write(r.content)
+        await m.reply_photo("logo.jpg", caption=f"**Logo for:** {name}")
+        os.remove("logo.jpg")
+    except: await m.reply("Error generating logo")
 
-@app.on_message(filters.me & filters.command("mute"))
-async def mute(client, message: Message):
-    if message.reply_to_message:
-        await client.restrict_chat_member(message.chat.id, message.reply_to_message.from_user.id, permissions=message.chat.permissions)
-        await message.edit("🔇 Muted")
+# ===== ADMIN =====
+@app.on_message(filters.command("panel") & filters.user(ADMIN_ID))
+async def panel(c,m):
+    users = c.execute("SELECT * FROM users").fetchall()
+    active = len([u for u in users if u[5]])
+    await m.reply(f"**👑 ADMIN PANEL**\n\n**Total Users:** `{len(users)}`\n**Active:** `{active}`")
 
-@app.on_message(filters.me & filters.command("unmute"))
-async def unmute(client, message: Message):
-    if message.reply_to_message:
-        await client.restrict_chat_member(message.chat.id, message.reply_to_message.from_user.id, permissions=message.chat.permissions)
-        await message.edit("🔊 Unmuted")
+@app.on_message(filters.command("allusers") & filters.user(ADMIN_ID))
+async def allusers(c,m):
+    users = c.execute("SELECT * FROM users").fetchall()
+    text = "**📜 ALL USERS**\n\n"
+    for u in users:
+        status = "✅" if u[5] else "❌"
+        text += f"{status} `{u[0]}` - {u[1]}\n"
+    await m.reply(text)
 
-# /id
-@app.on_message(filters.me & filters.command("id"))
-async def get_id(client, message: Message):
-    await message.edit(f"**Chat ID:** `{message.chat.id}`\n**Your ID:** `{message.from_user.id}`")
+@app.on_message(filters.command("broadcast") & filters.user(ADMIN_ID))
+async def broadcast(c,m):
+    msg = m.text.split(" ",1)[1]
+    users = c.execute("SELECT user_id FROM users").fetchall()
+    sent=0
+    for u in users:
+        try: await app.send_message(u[0], msg); sent+=1
+        except: pass
+    await m.reply(f"**Broadcast Done ✅**\nSent: `{sent}`")
 
-# /info
-@app.on_message(filters.me & filters.command("info"))
-async def userinfo(client, message: Message):
-    if not message.reply_to_message:
-        return await message.edit("Reply karke use kar")
-    user = message.reply_to_message.from_user
-    text = f"""**User Info:**
-**Name:** {user.first_name} {user.last_name or ""}
-**Username:** @{user.username or "None"}
-**ID:** `{user.id}`
-**Bio:** {user.bio or "None"}"""
-    await message.edit(text)
+@app.on_message(filters.command("help"))
+async def help_cmd(c,m):
+    await m.reply(
+"**📖 FULL COMMAND LIST**\n\n"
+"**ACCOUNT:**\n`/addsession API_ID API_HASH PHONE`\n`/otp CODE`\n`/logout`\n\n"
+"**FEATURES:**\n`/mygcast msg`\n`/mydcast msg`\n`/mystats`\n\n"
+"**AUTO REPLY:**\n`/setreply key reply`\n`/delreply key`\n`/listreply`\n\n"
+"**AI:**\n`/imagine prompt`\n`/logo name`"
+    )
 
-# /purge
-@app.on_message(filters.me & filters.command("purge"))
-async def purge(client, message: Message):
-    if not message.reply_to_message:
-        return await message.edit("Reply karke use kar")
-    chat_id = message.chat.id
-    msg_id = message.reply_to_message.id
-    await message.delete()
-    for i in range(msg_id, message.id):
-        try:
-            await client.delete_messages(chat_id, i)
-        except:
-            pass
-    await client.send_message(chat_id, "✅ Purged", disable_notification=True)
-
-# /broadcast
-@app.on_message(filters.me & filters.command("broadcast"))
-async def broadcast(client, message: Message):
-    if len(message.command) < 2:
-        return await message.edit("Use: `/broadcast your message`")
-    
-    msg = " ".join(message.command[1:])
-    await message.edit("📢 **Broadcast Starting...**")
-    
-    sent = 0
-    failed = 0
-    async for dialog in client.get_dialogs():
-        if dialog.chat.type in ["private", "group", "supergroup"]:
-            try:
-                await client.send_message(dialog.chat.id, f"📢 **Broadcast**\n\n{msg}")
-                sent += 1
-                await asyncio.sleep(3)
-            except FloodWait as e:
-                await asyncio.sleep(e.value)
-            except:
-                failed += 1
-    
-    await message.reply(f"**Broadcast Complete** ✅\n**Sent:** `{sent}` chats\n**Failed:** `{failed}` chats")
-
-# /gcast
-@app.on_message(filters.me & filters.command("gcast"))
-async def gcast(client, message: Message):
-    if len(message.command) < 2:
-        return await message.edit("Use: `/gcast your message`")
-    
-    msg = " ".join(message.command[1:])
-    await message.edit("📢 **Group Broadcast Starting...**")
-    
-    sent = 0
-    async for dialog in client.get_dialogs():
-        if dialog.chat.type in ["group", "supergroup"]:
-            try:
-                await client.send_message(dialog.chat.id, f"📢 **Group Broadcast**\n\n{msg}")
-                sent += 1
-                await asyncio.sleep(3)
-            except:
-                pass
-    
-    await message.reply(f"**Group Broadcast Complete** ✅\n**Sent:** `{sent}` groups")
-
-# /dcast
-@app.on_message(filters.me & filters.command("dcast"))
-async def dcast(client, message: Message):
-    if len(message.command) < 2:
-        return await message.edit("Use: `/dcast your message`")
-    
-    msg = " ".join(message.command[1:])
-    await message.edit("📢 **DM Broadcast Starting...**")
-    
-    sent = 0
-    async for dialog in client.get_dialogs():
-        if dialog.chat.type == "private" and not dialog.chat.is_bot:
-            try:
-                await client.send_message(dialog.chat.id, f"📢 **Message**\n\n{msg}")
-                sent += 1
-                await asyncio.sleep(3)
-            except:
-                pass
-    
-    await message.reply(f"**DM Broadcast Complete** ✅\n**Sent:** `{sent}` users")
-
-print("Userbot Started!")
+print("PRO TEAM BOT STARTED ✅")
 app.run()
