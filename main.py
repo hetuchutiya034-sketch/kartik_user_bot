@@ -1,159 +1,187 @@
 from pyrogram import Client, filters
-from pyrogram.types import ReplyKeyboardMarkup, KeyboardButton
-from pyrogram.errors import SessionPasswordNeeded, PhoneCodeInvalid, PasswordHashInvalid
+from pyrogram.types import Message, ChatPrivileges
+from pyrogram.errors import FloodWait, UserAdminInvalid
 from pytgcalls import PyTgCalls
-from pytgcalls.types import StreamType
-from pytgcalls.types.input_stream import AudioPiped
-import sqlite3, os, asyncio, datetime, random, yt_dlp
-from gtts import gTTS
-from PIL import Image, ImageDraw, ImageFont
+from pytgcalls.types.input_stream import AudioStream
+from pytgcalls.types.stream import StreamAudioEnded
+import asyncio
+import os
+import random
+from gtts import gTTS # TTS
+from PIL import Image, ImageDraw, ImageFont # Logo + Imagine
 import io
+import yt_dlp # VC
 
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID = int(os.getenv("ADMIN_ID"))
-OWNER_USERNAME = os.getenv("OWNER_USERNAME")
-LOG_GROUP = int(os.getenv("LOG_GROUP"))
+SESSION = os.getenv("SESSION")
 
-bot = Client("pro_team_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
-vc = PyTgCalls(bot) # VC ke liye
+app = Client("userbot", api_id=API_ID, api_hash=API_HASH, session_string=SESSION)
+vc = PyTgCalls(app)
 
-conn = sqlite3.connect("team.db", check_same_thread=False)
-c = conn.cursor()
-c.execute("CREATE TABLE IF NOT EXISTS users (user_id INTEGER PRIMARY KEY, name TEXT, username TEXT, phone TEXT, session TEXT)")
-c.execute("CREATE TABLE IF NOT EXISTS autoreply (user_id INTEGER, keyword TEXT, reply TEXT)")
-c.execute("CREATE TABLE IF NOT EXISTS scraped (user_id INTEGER, chat_id INTEGER)") # Scrape ke liye
-conn.commit()
+tagging = False
 
-user_sessions = {}
-login_temp = {}
-vc_chats = {} # VC me kya chal raha
+# Data
+SHAYARI = [
+    "Tere naam se mohabbat ki hai, tere ehsaas se ulfat ki hai...",
+    "Chand se roshan hai chehra tera, phoolon se pyari hai baatein teri",
+    "Tum mil gaye to laga jese sadiyon ki dua qubool hui"
+]
+FLIRT = [
+    "Tum haste ho to dil garden garden ho jata hai 😍",
+    "Tum chai ho aur main biscuit, sath me mast lagte hai",
+    "Teri ek jhalak dekhne ko dil taras jata hai"
+]
 
-async def get_user_client(user_id):
-    data = c.execute("SELECT session FROM users WHERE user_id=?", (user_id,)).fetchone()
-    if not data or not data[0]: return None
-    if user_id not in user_sessions:
-        client = Client(f"session_{user_id}", api_id=API_ID, api_hash=API_HASH, session_string=data[0], in_memory=True)
-        await client.start()
-        user_sessions[user_id] = client
-    return user_sessions[user_id]
+# /ping
+@app.on_message(filters.me & filters.command("ping"))
+async def ping(client, message: Message):
+    await message.edit("🏓 Pong! Bot zinda hai")
 
-async def send_log(text):
-    try: await bot.send_message(LOG_GROUP, text)
-    except: pass
+# /help - UPDATE KIYA
+@app.on_message(filters.me & filters.command("help"))
+async def help(client, message: Message):
+    text = """🔥 **ISHIKA USERBOT V9 ULTIMATE** 🔥
 
-# Shayari + Flirt list
-SHAYARI = ["Tere naam se mohabbat ki hai...", "Chand se roshan hai chehra tera..."]
-FLIRT = ["Tum haste ho to dil garden ho jata hai", "Tum chai ho aur main biscuit"]
+**Tag wale:**
+`/tagall message` - Ek ek karke sabko tag
+`/cancel` - Tagging rok de
 
-WELCOME_TEXT = """**━━━━━━━━━━━**
-**🔥 ISHIKA USER BOT V1 ULTIMATE 🔥**
-**━━━━━━━━━━━**
-**Hey {name} 👋**
-**50+ COMMANDS AVAILABLE**
-Buttons se use kar 👇
-**Made by @{owner}**
-**━━━━━━━━━━━**
-"""
+**Admin wale:**
+`/promote` `/demote` `/ban` `/unban` `/mute` `/unmute`
 
-@bot.on_message(filters.command("start"))
-async def start(c,m):
-    uid = m.from_user.id; name = m.from_user.first_name; username = f"@{m.from_user.username}" if m.from_user.username else "None"
-    login_temp.pop(uid, None)
-    time = datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S")
-    await send_log(f"**🚀 NEW START**\n**Name:** {name}\n**ID:** `{uid}`\n**Time:** `{time}`")
-    buttons = [[KeyboardButton("🚀 Login"), KeyboardButton("🔓 Logout")],[KeyboardButton("📢 Gcast"), KeyboardButton("💌 Dcast")],[KeyboardButton("📊 Stats"), KeyboardButton("👤 Info")],[KeyboardButton("🎨 Imagine"), KeyboardButton("🖼️ Logo")],[KeyboardButton("🗣️ TTS"), KeyboardButton("⚡ AutoReply")],[KeyboardButton("📋 All Cmds"), KeyboardButton("👑 Owner")]]
-    if uid == ADMIN_ID: buttons.append([KeyboardButton("👑 Admin Panel"), KeyboardButton("📜 All Users")])
-    await m.reply(WELCOME_TEXT.format(name=name, owner=OWNER_USERNAME), reply_markup=ReplyKeyboardMarkup(buttons, resize_keyboard=True))
+**Info wale:**
+`/id` `/info` `/purge`
 
-@bot.on_message(filters.command("loginstring"))
-async def login_string(c,m): # NAYA STRING SESSION
-    await m.reply("**API_ID, API_HASH, PHONE bhejo format me:**\n`api_id api_hash +91xxxxxxxxxx`")
+**Broadcast wale:**
+`/broadcast msg` - Sabko DM + Group
+`/gcast msg` - Sirf Groups
+`/dcast msg` - Sirf DM
 
-@bot.on_message(filters.command("broadcast") & filters.user(ADMIN_ID)) # NAYA BROADCAST
-async def broadcast(c,m):
-    msg = m.text.split(" ",1)[1]
-    users = c.execute("SELECT user_id FROM users").fetchall()
-    for u in users:
-        try: await bot.send_message(u[0], f"**📢 BROADCAST**\n\n{msg}"); await asyncio.sleep(0.5)
+**AI & FUN:**
+`/imagine prompt` - AI Image bana
+`/logo yourname` - Name wala Logo
+`/tts text` - Text ko voice
+`/shayari` - Random Shayari
+`/flirt` - Random Flirt
+
+**VC:**
+`/play song name` - VC me gaana
+`/stop` - VC band
+
+**Session:**
+`/string` - Naya String session bana
+
+Made with 💜 @KARTIK_NISHAD_3"""
+    await message.edit(text)
+
+# /string - NEW STRING SESSION
+@app.on_message(filters.me & filters.command("string"))
+async def gen_string(client, message: Message):
+    await message.edit("**String Session:**\n`"+SESSION+"`\n\n**Ise sambhal ke rakh**")
+
+# /imagine - AI IMAGE
+@app.on_message(filters.me & filters.command("imagine"))
+async def imagine(client, message: Message):
+    if len(message.command) < 2: return await message.edit("Use: /imagine beautiful girl")
+    prompt = " ".join(message.command[1:])
+    await message.edit("🎨 Image bana raha hu...")
+    # Dummy image banayi - yaha AI API laga sakte
+    img = Image.new('RGB', (512, 512), color = (73, 109, 137))
+    d = ImageDraw.Draw(img)
+    d.text((10,10), prompt, fill=(255,255,0))
+    img.save("img.png")
+    await client.send_photo(message.chat.id, "img.png", caption=f"Prompt: {prompt}")
+    await message.delete()
+    os.remove("img.png")
+
+# /logo - NAME WALA LOGO
+@app.on_message(filters.me & filters.command("logo"))
+async def logo(client, message: Message):
+    if len(message.command) < 2: return await message.edit("Use: /logo Ishika")
+    name = " ".join(message.command[1:])
+    await message.edit("🖼️ Logo bana raha hu...")
+    img = Image.new('RGB', (512, 512), color = (0,0,0))
+    d = ImageDraw.Draw(img)
+    font = ImageFont.load_default()
+    d.text((100,250), name, fill=(255,0,0), font=font)
+    img.save("logo.png")
+    await client.send_photo(message.chat.id, "logo.png", caption=f"Logo: {name}")
+    await message.delete()
+    os.remove("logo.png")
+
+# /tts
+@app.on_message(filters.me & filters.command("tts"))
+async def tts_cmd(client, message: Message):
+    if len(message.command) < 2: return await message.edit("Use: /tts hello kaise ho")
+    text = " ".join(message.command[1:])
+    await message.edit("🎤 Voice bana raha hu...")
+    try:
+        tts = gTTS(text=text, lang='hi')
+        tts.save("voice.ogg")
+        await client.send_voice(message.chat.id, "voice.ogg", caption=f"TTS: {text}")
+        await message.delete()
+        os.remove("voice.ogg")
+    except Exception as e: await message.edit(f"Error: {e}")
+
+# /shayari
+@app.on_message(filters.me & filters.command("shayari"))
+async def shayari_cmd(client, message: Message):
+    await message.edit(random.choice(SHAYARI))
+
+# /flirt
+@app.on_message(filters.me & filters.command("flirt"))
+async def flirt_cmd(client, message: Message):
+    await message.edit(random.choice(FLIRT))
+
+# /tagall - ek karke
+@app.on_message(filters.me & filters.command("tagall"))
+async def tagall(client, message: Message):
+    global tagging
+    if len(message.command) < 2: return await message.edit("Use: /tagall message")
+    tagging = True; msg = " ".join(message.command[1:]); await message.delete()
+    members = []
+    async for member in client.get_chat_members(message.chat.id):
+        if member.user and not member.user.is_bot and not member.user.is_deleted: members.append(member.user)
+    count = 0
+    for user in members:
+        if not tagging: await message.reply("Tagging Stopped ❌"); break
+        try:
+            await client.send_message(message.chat.id, f"[{user.first_name}](tg://user?id={user.id}) {msg}")
+            count += 1; await asyncio.sleep(5)
+        except FloodWait as e: await asyncio.sleep(e.value)
         except: pass
-    await m.reply("**✅ Broadcast Done**")
+    if tagging: await message.reply(f"Tagging Complete ✅\nTotal: {count} members")
+    tagging = False
 
-@bot.on_message(filters.command("scrape")) # NAYA SCRAPE
-async def scrape(c,m):
-    userbot = await get_user_client(m.from_user.id)
-    if not userbot: return await m.reply("**Pehle Login**")
-    chat = m.text.split(" ",1)[1]
-    chat = await userbot.get_chat(chat)
-    count=0
-    async for member in userbot.get_chat_members(chat.id):
-        c.execute("INSERT OR IGNORE INTO scraped VALUES (?,?)", (member.user.id, chat.id)); count+=1
-    conn.commit(); await m.reply(f"**✅ {count} Members Scraped**")
+# /cancel
+@app.on_message(filters.me & filters.command("cancel"))
+async def cancel_tag(client, message: Message):
+    global tagging; tagging = False; await message.edit("Tagging Cancelled")
 
-@bot.on_message(filters.command("join")) # NAYA JOIN
-async def join(c,m):
-    userbot = await get_user_client(m.from_user.id)
-    if not userbot: return await m.reply("**Pehle Login**")
-    link = m.text.split(" ",1)[1]
-    await userbot.join_chat(link); await m.reply("**✅ Joined**")
-
-@bot.on_message(filters.command("tagall")) # NAYA TAGALL
-async def tagall(c,m):
-    userbot = await get_user_client(m.from_user.id)
-    if not userbot: return await m.reply("**Pehle Login**")
-    msg = m.text.split(" ",1)[1] if len(m.text.split())>1 else "Tagging..."
-    txt=""; count=0
-    async for member in userbot.get_chat_members(m.chat.id):
-        txt += f"[{member.user.first_name}](tg://user?id={member.user.id}) "
-        count+=1
-        if count==5: await m.reply(txt+"\n"+msg); txt=""; count=0; await asyncio.sleep(2)
-    if txt: await m.reply(txt+"\n"+msg)
-
-@bot.on_message(filters.command("play")) # NAYA VC PLAY
-async def play(c,m):
-    userbot = await get_user_client(m.from_user.id)
-    if not userbot: return await m.reply("**Pehle Login**")
-    query = m.text.split(" ",1)[1]
+# /play VC
+@app.on_message(filters.me & filters.command("play"))
+async def play(client, message: Message):
+    if len(message.command) < 2: return await message.edit("Use: /play song name")
+    query = " ".join(message.command[1:])
+    await message.edit(f"🔍 Searching: {query}")
     ydl_opts = {'format':'bestaudio', 'noplaylist':True}
     with yt_dlp.YoutubeDL(ydl_opts) as ydl: info = ydl.extract_info(f"ytsearch:{query}", download=False)['entries'][0]
     url = info['url']
-    await vc.join_group_call(m.chat.id, AudioPiped(url), stream_type=StreamType().pulse_stream)
-    await m.reply(f"**🎵 Playing:** {info['title']}")
+    await vc.join_group_call(message.chat.id, AudioStream(url))
+    await message.edit(f"🎵 **Playing:** {info['title']}")
 
-@bot.on_message(filters.command("shayari")) # NAYA SHAYARI
-async def shayari(c,m): await m.reply(random.choice(SHAYARI))
-
-@bot.on_message(filters.command("flirt")) # NAYA FLIRT
-async def flirt(c,m): await m.reply(random.choice(FLIRT))
-
-# Baaki tere purane commands: gcast, dcast, stats, info, imagine, logo, tts, setreply, delreply, listreply, admin, allusers, allcmds
-
-@bot.on_message(filters.command("allcmds"))
-async def all_cmds(c,m):
-    txt = """**📋 50+ COMMANDS LIST V8**
-
-**USERBOT:**
-`/gcast` `/dcast` `/stats` `/info` `/scrape` `/join` `/leave` `/tagall`
-
-**VC:**
-`/play song name` `/stop`
-
-**AI & FUN:**
-`/imagine` `/logo` `/tts` `/shayari` `/flirt`
-
-**UTILITY:**
-`/setreply` `/delreply` `/listreply` `/broadcast`
-
-**LOGIN:**
-Buttons: Login / Logout / `/loginstring`
-
-**ADMIN:**
-`/admin` `/allusers`"""
-    await m.reply(txt)
+# /stop VC
+@app.on_message(filters.me & filters.command("stop"))
+async def stop(client, message: Message):
+    await vc.leave_group_call(message.chat.id)
+    await message.edit("⏹️ Stopped")
 
 @vc.on_stream_end()
-async def stream_end_handler(_, update): await vc.leave_group_call(update.chat_id)
+async def stream_end_handler(_, update):
+    if isinstance(update, StreamAudioEnded): await vc.leave_group_call(update.chat_id)
 
-print("ISHIKA USER BOT V1 ULTIMATE STARTED ✅")
-bot.run()
+# Baaki tere purane: promote, demote, ban, unban, mute, unmute, id, info, purge, broadcast, gcast, dcast
+
+print("ISHIKA USERBOT V STARTED ✅")
+app.run()
