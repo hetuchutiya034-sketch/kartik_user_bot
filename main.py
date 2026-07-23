@@ -1,23 +1,18 @@
 from pyrogram import Client, filters
-from pyrogram.types import Message, ChatPrivileges
+from pyrogram.types import Message, ChatPrivileges, ChatMemberUpdated
 from pyrogram.errors import FloodWait, UserAdminInvalid
-from pytgcalls import PyTgCalls
-from pytgcalls.types.input_stream import AudioStream
-from pytgcalls.types.stream import StreamAudioEnded
 import asyncio
 import os
 import random
-from gtts import gTTS # TTS
-from PIL import Image, ImageDraw, ImageFont # Logo + Imagine
+from gtts import gTTS
+from PIL import Image, ImageDraw, ImageFont
 import io
-import yt_dlp # VC
 
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
 SESSION = os.getenv("SESSION")
 
 app = Client("userbot", api_id=API_ID, api_hash=API_HASH, session_string=SESSION)
-vc = PyTgCalls(app)
 
 tagging = False
 
@@ -28,9 +23,18 @@ SHAYARI = [
     "Tum mil gaye to laga jese sadiyon ki dua qubool hui"
 ]
 FLIRT = [
-    "Tum haste ho to dil garden garden ho jata hai 😍",
+    "Tum haste ho to dil garden ho jata hai 😍",
     "Tum chai ho aur main biscuit, sath me mast lagte hai",
     "Teri ek jhalak dekhne ko dil taras jata hai"
+]
+
+# WELCOME TEMPLATES - HOT SEXY
+WELCOMES = [
+    "🔥 **WELCOME TO THE JUNGLE** 🔥\n\nHey [{name}](tg://user?id={id}) baby 😈\nItni sexy entry maari hai tune\nGroup me aag laga di 💋\nEnjoy karo jaan",
+    
+    "💎 **NEW DIAMOND ARRIVED** 💎\n\nWelcome {name} 😘\nTumhare aate hi group ki shaan badh gayi\nBaithe raho yaha, maza aayega",
+    
+    "👑 **KING/QUEEN ENTERED** 👑\n\nAao {name} ji aao\nTumhara hi intezaar tha\nGroup ab garam ho gaya 🔥"
 ]
 
 # /ping
@@ -38,10 +42,10 @@ FLIRT = [
 async def ping(client, message: Message):
     await message.edit("🏓 Pong! Bot zinda hai")
 
-# /help - UPDATE KIYA
+# /help
 @app.on_message(filters.me & filters.command("help"))
 async def help(client, message: Message):
-    text = """🔥 **ISHIKA USERBOT V9 ULTIMATE** 🔥
+    text = """🔥 **ISHIKA USERBOT V1 ULTIMATE** 🔥
 
 **Tag wale:**
 `/tagall message` - Ek ek karke sabko tag
@@ -65,37 +69,41 @@ async def help(client, message: Message):
 `/shayari` - Random Shayari
 `/flirt` - Random Flirt
 
-**VC:**
-`/play song name` - VC me gaana
-`/stop` - VC band
-
 **Session:**
-`/string` - Naya String session bana
+`/string` - Tera String session
 
 Made with 💜 @KARTIK_NISHAD_3"""
     await message.edit(text)
 
-# /string - NEW STRING SESSION
+# WELCOME HANDLER - GROUP JOIN
+@app.on_message(filters.group & filters.new_chat_members)
+async def welcome(client, message: Message):
+    for user in message.new_chat_members:
+        if user.id == (await client.get_me()).id: # agar khud join hue
+            continue
+        wel = random.choice(WELCOMES).format(name=user.first_name, id=user.id)
+        await client.send_message(message.chat.id, wel)
+
+# /string
 @app.on_message(filters.me & filters.command("string"))
 async def gen_string(client, message: Message):
-    await message.edit("**String Session:**\n`"+SESSION+"`\n\n**Ise sambhal ke rakh**")
+    await message.edit(f"**String Session:**\n`{SESSION}`\n\n**Ise kisi ko mat dena**")
 
-# /imagine - AI IMAGE
+# /imagine
 @app.on_message(filters.me & filters.command("imagine"))
 async def imagine(client, message: Message):
     if len(message.command) < 2: return await message.edit("Use: /imagine beautiful girl")
     prompt = " ".join(message.command[1:])
     await message.edit("🎨 Image bana raha hu...")
-    # Dummy image banayi - yaha AI API laga sakte
     img = Image.new('RGB', (512, 512), color = (73, 109, 137))
     d = ImageDraw.Draw(img)
-    d.text((10,10), prompt, fill=(255,255,0))
+    d.text((10,250), prompt[:30], fill=(255,255,0))
     img.save("img.png")
     await client.send_photo(message.chat.id, "img.png", caption=f"Prompt: {prompt}")
     await message.delete()
     os.remove("img.png")
 
-# /logo - NAME WALA LOGO
+# /logo
 @app.on_message(filters.me & filters.command("logo"))
 async def logo(client, message: Message):
     if len(message.command) < 2: return await message.edit("Use: /logo Ishika")
@@ -103,8 +111,7 @@ async def logo(client, message: Message):
     await message.edit("🖼️ Logo bana raha hu...")
     img = Image.new('RGB', (512, 512), color = (0,0,0))
     d = ImageDraw.Draw(img)
-    font = ImageFont.load_default()
-    d.text((100,250), name, fill=(255,0,0), font=font)
+    d.text((100,250), name[:15], fill=(255,0,0))
     img.save("logo.png")
     await client.send_photo(message.chat.id, "logo.png", caption=f"Logo: {name}")
     await message.delete()
@@ -134,7 +141,7 @@ async def shayari_cmd(client, message: Message):
 async def flirt_cmd(client, message: Message):
     await message.edit(random.choice(FLIRT))
 
-# /tagall - ek karke
+# /tagall
 @app.on_message(filters.me & filters.command("tagall"))
 async def tagall(client, message: Message):
     global tagging
@@ -159,29 +166,8 @@ async def tagall(client, message: Message):
 async def cancel_tag(client, message: Message):
     global tagging; tagging = False; await message.edit("Tagging Cancelled")
 
-# /play VC
-@app.on_message(filters.me & filters.command("play"))
-async def play(client, message: Message):
-    if len(message.command) < 2: return await message.edit("Use: /play song name")
-    query = " ".join(message.command[1:])
-    await message.edit(f"🔍 Searching: {query}")
-    ydl_opts = {'format':'bestaudio', 'noplaylist':True}
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl: info = ydl.extract_info(f"ytsearch:{query}", download=False)['entries'][0]
-    url = info['url']
-    await vc.join_group_call(message.chat.id, AudioStream(url))
-    await message.edit(f"🎵 **Playing:** {info['title']}")
+# /promote /demote /ban /unban /mute /unmute /id /info /purge /broadcast /gcast /dcast
+# [Yaha tere purane wale saare command same rahenge - jagah bachane ke liye nahi likhe]
 
-# /stop VC
-@app.on_message(filters.me & filters.command("stop"))
-async def stop(client, message: Message):
-    await vc.leave_group_call(message.chat.id)
-    await message.edit("⏹️ Stopped")
-
-@vc.on_stream_end()
-async def stream_end_handler(_, update):
-    if isinstance(update, StreamAudioEnded): await vc.leave_group_call(update.chat_id)
-
-# Baaki tere purane: promote, demote, ban, unban, mute, unmute, id, info, purge, broadcast, gcast, dcast
-
-print("ISHIKA USERBOT V STARTED ✅")
+print("ISHIKA USERBOT V1 STARTED ✅")
 app.run()
