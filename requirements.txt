@@ -1,5 +1,6 @@
-pyrogram
-pytgcalls
+pyrogram==2.0.106
+pytgcalls==0.0.5
 yt-dlp
 gtts
 Pillow
+tgcalls==0.0.3
