@@ -2,11 +2,11 @@ from pyrogram import Client, filters
 from pyrogram.types import ReplyKeyboardMarkup, KeyboardButton
 import sqlite3, os, asyncio, datetime, requests
 
-API_ID = int(os.getenv("API_ID", "21942928"))
-API_HASH = os.getenv("API_HASH", "4b6b2ee1e93a7e14e0c17f1869999a71")
-BOT_TOKEN = os.getenv("BOT_TOKEN", "8407056483:AAEc3x3AiZZ4ndI7Vro6jE4XZ9g1VVd_vOk")
-ADMIN_ID = int(os.getenv("ADMIN_ID", "7967825682"))
-OWNER_USERNAME = os.getenv("OWNER_USERNAME", "KARTIK_NISHAD_3")
+API_ID = int(os.getenv("API_ID", "123456"))
+API_HASH = os.getenv("API_HASH", "tera_api_hash")
+BOT_TOKEN = os.getenv("BOT_TOKEN", "bot_token_yaha")
+ADMIN_ID = int(os.getenv("ADMIN_ID", "12345678"))
+OWNER_USERNAME = os.getenv("OWNER_USERNAME", "tera_username")
 
 app = Client("pro_team_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
