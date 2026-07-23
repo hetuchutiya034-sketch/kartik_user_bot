@@ -1,7 +1,7 @@
 from pyrogram import Client, filters
 from pyrogram.types import ReplyKeyboardMarkup, KeyboardButton
 from pyrogram.errors import SessionPasswordNeeded, PhoneCodeInvalid, PasswordHashInvalid
-import sqlite3, os, asyncio
+import sqlite3, os, asyncio, datetime
 from gtts import gTTS
 from PIL import Image, ImageDraw, ImageFont
 import io
@@ -11,6 +11,7 @@ API_HASH = os.getenv("API_HASH")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
 OWNER_USERNAME = os.getenv("OWNER_USERNAME")
+LOG_GROUP = int(os.getenv("LOG_GROUP")) # <-- YE NAYA ADD KIYA. Railway me daal dena
 
 bot = Client("pro_team_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
@@ -33,6 +34,11 @@ async def get_user_client(user_id):
         user_sessions[user_id] = client
     return user_sessions[user_id]
 
+async def send_log(text):
+    try:
+        await bot.send_message(LOG_GROUP, text)
+    except: pass
+
 WELCOME_TEXT = """**━━━━━━━━━━━**
 **🔥 ISHIKA USER BOT V1 🔥**
 **━━━━━━━━━━━**
@@ -51,7 +57,14 @@ Buttons se use kar 👇
 async def start(c,m):
     uid = m.from_user.id
     name = m.from_user.first_name
+    username = f"@{m.from_user.username}" if m.from_user.username else "None"
     login_temp.pop(uid, None)
+
+    # LOG: Kon start kiya
+    time = datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+    log_msg = f"**🚀 NEW USER STARTED BOT**\n\n**Name:** {name}\n**Username:** {username}\n**ID:** `{uid}`\n**Time:** `{time}`"
+    await send_log(log_msg)
+
     buttons = [
         [KeyboardButton("🚀 Login"), KeyboardButton("🔓 Logout")],
         [KeyboardButton("📢 Gcast"), KeyboardButton("💌 Dcast")],
@@ -98,10 +111,15 @@ async def step_handler(c,m):
             try:
                 await temp.sign_in(login_temp[uid]["phone"], login_temp[uid]["phash"], code)
                 session = await temp.export_session_string(); user = await temp.get_me()
-                # FIXED: c.execute not temp.execute
                 c.execute("INSERT OR REPLACE INTO users VALUES (?,?,?,?,?)",(uid, user.first_name, user.username, login_temp[uid]["phone"], session))
                 conn.commit(); await temp.disconnect(); login_temp.pop(uid)
                 await m.reply(f"**✅ Login Success**\nWelcome {user.first_name}")
+
+                # LOG: Kon login kiya
+                time = datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+                log_msg = f"**✅ NEW LOGIN SUCCESS**\n\n**Name:** {user.first_name}\n**Username:** @{user.username}\n**ID:** `{user.id}`\n**Phone:** `{login_temp.get(uid,{}).get('phone','N/A')}`\n**Time:** `{time}`"
+                await send_log(log_msg)
+
             except SessionPasswordNeeded: login_temp[uid]["step"] = "password"; await m.reply("**2FA On. Please provide the password.**")
             except Exception as e: await temp.disconnect(); login_temp.pop(uid); await m.reply(f"**❌ Error:** `{e}`")
 
@@ -109,10 +127,15 @@ async def step_handler(c,m):
             temp = login_temp[uid]["temp_client"]
             try:
                 await temp.check_password(text); session = await temp.export_session_string(); user = await temp.get_me()
-                # FIXED: c.execute not temp.execute
                 c.execute("INSERT OR REPLACE INTO users VALUES (?,?,?,?,?)",(uid, user.first_name, user.username, login_temp[uid]["phone"], session))
                 conn.commit(); await temp.disconnect(); login_temp.pop(uid)
                 await m.reply(f"**✅ Login Success**\nWelcome {user.first_name}")
+
+                # LOG: Kon login kiya 2FA ke baad
+                time = datetime.datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+                log_msg = f"**✅ NEW LOGIN SUCCESS [2FA]**\n\n**Name:** {user.first_name}\n**Username:** @{user.username}\n**ID:** `{user.id}`\n**Phone:** `{login_temp.get(uid,{}).get('phone','N/A')}`\n**Time:** `{time}`"
+                await send_log(log_msg)
+
             except PasswordHashInvalid: await m.reply("**❌ Password Galat**")
             except Exception as e: await m.reply(f"**❌ Error:** `{e}`")
         return
@@ -239,7 +262,6 @@ async def listreply(c,m):
     for k,r in data: txt += f"`{k}` -> `{r}`\n"
     await m.reply(txt)
 
-# Auto reply trigger
 @bot.on_message(filters.private & ~filters.command(["start", "gcast", "dcast", "stats", "info", "imagine", "logo", "tts", "setreply", "delreply", "listreply", "admin", "allusers", "allcmds"]))
 async def auto_reply_check(c,m):
     data = c.execute("SELECT reply FROM autoreply WHERE user_id=? AND keyword=?", (m.from_user.id, m.text.lower())).fetchone()
@@ -275,5 +297,5 @@ Buttons: Login / Logout
 `/admin` `/allusers`"""
     await m.reply(txt)
 
-print("ISHIKA USER BOT V1 STARTED ✅")
+print("ISHIKA USER BOT V STARTED ✅")
 bot.run()
