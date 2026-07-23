@@ -33,16 +33,16 @@ async def get_user_client(user_id):
         user_sessions[user_id] = client
     return user_sessions[user_id]
 
-WELCOME_TEXT = f"""**━━━━━━━━━━━**
-**🔥 ISHIKA USER BOT V1 🔥**
+WELCOME_TEXT = """**━━━━━━━━━━━**
+**🔥 ISHIKA USER BOT V6 🔥**
 **━━━━━━━━━━━**
 
-**Hey {{name}} 👋**
+**Hey {name} 👋**
 **40+ COMMANDS AVAILABLE**
 
 Buttons se use kar 👇
 
-**Made by @{OWNER_USERNAME}**
+**Made by @{owner}**
 **━━━━━━━━━━━**
 """
 
@@ -62,7 +62,7 @@ async def start(c,m):
     ]
     if uid == ADMIN_ID:
         buttons.append([KeyboardButton("👑 Admin Panel"), KeyboardButton("📜 All Users")])
-    await m.reply(WELCOME_TEXT.format(name=name), reply_markup=ReplyKeyboardMarkup(buttons, resize_keyboard=True))
+    await m.reply(WELCOME_TEXT.format(name=name, owner=OWNER_USERNAME), reply_markup=ReplyKeyboardMarkup(buttons, resize_keyboard=True))
 
 # ===== LOGIN FLOW =====
 @bot.on_message(filters.text & filters.private & filters.regex("^🚀 Login$"))
@@ -110,6 +110,7 @@ async def step_handler(c,m):
                 conn.commit(); await temp.disconnect(); login_temp.pop(uid)
                 await m.reply(f"**✅ Login Success**\nWelcome {user.first_name}")
             except PasswordHashInvalid: await m.reply("**❌ Password Galat**")
+            except Exception as e: await m.reply(f"**❌ Error:** `{e}`")
         return
     await button_handler(c,m)
 
@@ -206,8 +207,8 @@ async def tts(c,m):
     try: text = m.text.split(" ",1)[1]
     except: return await m.reply("**Format:** `/tts Hello`")
     await m.reply("**🗣️ Generating Voice...**")
-    tts = gTTS(text=text, lang='hi')
-    tts.save("voice.mp3")
+    tts_obj = gTTS(text=text, lang='hi')
+    tts_obj.save("voice.mp3")
     await m.reply_audio("voice.mp3")
     os.remove("voice.mp3")
 
@@ -255,22 +256,22 @@ async def all_cmds(c,m):
     txt = """**📋 40+ COMMANDS LIST**
 
 **USERBOT:**
-/gcast, /dcast, /stats, /info, /join, /leave
+`/gcast` `/dcast` `/stats` `/info`
 
 **AI & FUN:**
-/imagine, /logo, /tts
+`/imagine` `/logo` `/tts`
 
 **UTILITY:**
-/setreply, /delreply, /listreply, /ping, /id
+`/setreply` `/delreply` `/listreply`
 
 **LOGIN:**
-/login, /logout
+Buttons: Login / Logout
 
 **ADMIN:**
-/broadcast, /allusers
+`/admin` `/allusers`
 
-Aur bhi commands add kar dunga"""
+Aur commands add kar dunga"""
     await m.reply(txt)
 
-print("ISHIKA USER BOT V1 STARTED ✅")
+print("ISHIKA USER BOT V6 STARTED ✅")
 bot.run()
