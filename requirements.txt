@@ -1,5 +1,5 @@
 pyrogram
-tgcrypto
+pytgcalls
+yt-dlp
 gtts
 Pillow
-requests
