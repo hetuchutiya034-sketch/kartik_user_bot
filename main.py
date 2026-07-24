@@ -1,5 +1,5 @@
 from pyrogram import Client, filters
-from pyrogram.types import Message, ChatPrivileges
+from pyrogram.types import Message, ChatPrivileges, InlineKeyboardMarkup, InlineKeyboardButton
 from pyrogram.errors import FloodWait, ChatWriteForbidden
 import asyncio, os, random, requests
 from gtts import gTTS
@@ -8,6 +8,7 @@ from googletrans import Translator
 from PIL import Image, ImageDraw, ImageFont
 from io import BytesIO
 import yt_dlp
+import aiohttp # <-- logo ke liye add kiya
 
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
@@ -19,6 +20,11 @@ recognizer = sr.Recognizer()
 tagging = False
 tagsh_active = {} # tagsh ke liye
 welcome_on = {}
+
+# ============= SETTINGS =============
+SUPPORT_GROUP = "https://t.me/+AAB-iIMnebBmMWZl" 
+UPDATE_CHANNEL = "https://t.me/+AAB-iIMnebBmMWZl" 
+DM_USERNAME = "https://t.me/KARTIK_NISHAD_3" 
 
 # ============= DATA =============
 SHAYARI_LIST = [
@@ -64,8 +70,8 @@ FLIRT = [
 ]
 
 WELCOMES = [
-    "🔥 **WELCOME TO THE JUNGLE** 🔥\n\nHey [{name}](tg://user?id={id}) baby 😈\nItni sexy entry maari hai tune",
-    "💎 **NEW DIAMOND ARRIVED** 💎\n\nWelcome {name} 😘\nTumhare aate hi group ki shaan badh gayi"
+    "✨ **NEW MEMBER ALERT** ✨\n\n**Name:** {name}\n**ID:** `{id}`\n**Username:** @{username}\n\n**Welcome to {chat}** 💎\nTumhare aane se group me rounak aa gayi 😍",
+    "🔥 **SWAG WELCOME** 🔥\n\nHey [{name}](tg://user?id={id}) baby 😈\n**ID:** `{id}`\n**@:** @{username}\n\n**{chat}** me dil se swagat hai ❤️"
 ]
 
 JOKES = [
@@ -80,13 +86,13 @@ async def ping(client, message: Message): await message.edit("🏓 Pong! Bot zin
 
 @app.on_message(filters.me & filters.command("help"))
 async def help(client, message: Message):
-    text = """🔥 **ISHIKA USERBOT V1.6 ULTIMATE** 🔥
+    text = """🔥 **ISHIKA USERBOT V1.8 LOGO UPDATE** 🔥
 
 **Tag/Admin:** `/tagall` `/cancel` `/tagsh` `/stoptagsh` `/promote` `/demote` `/ban` `/unban` `/mute` `/unmute`
 **Extra Admin:** `/kick` `/warn` `/zombies`
 **Info:** `/id` `/info` `/purge`
 **Broadcast:** `/broadcast` `/gcast` `/dcast`
-**AI/Fun:** `/imagine` `/anime` `/couple` `/tts` `/shayari` `/flirt` `/joke` `/meme`
+**AI/Fun:** `/imagine` `/anime` `/couple` `/logo` `/tts` `/shayari` `/flirt` `/joke` `/meme`
 **New Tools:** `/insta` `/stt` `/tr` `/weather`
 **Group:** `/welcome on/off`
 **Session:** `/string`"""
@@ -96,21 +102,63 @@ async def help(client, message: Message):
 async def gen_string(client, message: Message):
     await message.edit(f"**String Session:**\n`{SESSION}`")
 
-# ============= WELCOME =============
+# ============= WELCOME PREMIUM =============
 @app.on_message(filters.me & filters.command("welcome") & filters.group)
 async def welcome_toggle(client, message: Message):
     global welcome_on
-    if len(message.command) < 2: return await message.edit("Use: `/welcome on` or `/welcome off`")
+    if len(message.command) < 2:
+        return await message.edit("Use: `/welcome on` or `/welcome off`")
     welcome_on[message.chat.id] = True if message.command[1] == "on" else False
     await message.edit(f"✅ Welcome {'ON' if welcome_on[message.chat.id] else 'OFF'}")
 
 @app.on_message(filters.group & filters.new_chat_members)
 async def welcome(client, message: Message):
-    if not welcome_on.get(message.chat.id, True): return
+    if not welcome_on.get(message.chat.id, True):
+        return
     for user in message.new_chat_members:
-        if not user.is_self:
-            wel = random.choice(WELCOMES).format(name=user.first_name, id=user.id)
-            await client.send_message(message.chat.id, wel)
+        if user.is_self:
+            continue
+
+        chat = await client.get_chat(message.chat.id)
+        username = user.username if user.username else "NoUsername"
+
+        # User DP
+        photos = [p async for p in client.get_chat_photos(user.id, limit=1)]
+        photo = photos[0].file_id if photos else None
+
+        # Welcome text
+        wel = random.choice(WELCOMES).format(
+            name=user.first_name,
+            id=user.id,
+            username=username,
+            chat=chat.title
+        )
+
+        # 4 Buttons
+        buttons = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🛡️ Support Group", url=SUPPORT_GROUP)],
+            [InlineKeyboardButton("📢 Update Channel", url=UPDATE_CHANNEL)],
+            [InlineKeyboardButton("💬 DM Me", url=DM_USERNAME)],
+            [InlineKeyboardButton("📖 Help & Commands", callback_data="help")]
+        ])
+
+        if photo:
+            await client.send_photo(message.chat.id, photo=photo, caption=wel, reply_markup=buttons)
+        else:
+            await client.send_message(message.chat.id, wel, reply_markup=buttons)
+
+@app.on_callback_query(filters.regex("help"))
+async def help_button(client, callback_query):
+    text = """🔥 **ISHIKA USERBOT COMMANDS** 🔥
+
+**Tag/Admin:** `/tagall` `/cancel` `/tagsh` `/stoptagsh`
+**Extra:** `/promote` `/demote` `/ban` `/unban` `/mute` `/unmute` `/kick` `/warn`
+**Info:** `/id` `/info` `/purge`
+**Fun/AI:** `/shayari` `/flirt` `/joke` `/meme` `/imagine` `/anime` `/couple` `/logo` `/tts`
+**Tools:** `/insta` `/stt` `/tr` `/weather`
+**Group:** `/welcome on/off`
+**Broadcast:** `/broadcast` `/gcast` `/dcast`"""
+    await callback_query.answer(text, show_alert=True)
 
 # ============= AI & MEDIA =============
 @app.on_message(filters.me & filters.command("imagine"))
@@ -135,6 +183,79 @@ async def couple_logo(client, message: Message):
     img = Image.open(BytesIO(requests.get("https://i.imgur.com/8QfZ3pL.jpg").content)).resize((512,512))
     ImageDraw.Draw(img).text((256,420), f"{message.command[1]} ❤️ {message.command[2]}", fill=(255,20,147), anchor="mm")
     img.save("couple.png"); await client.send_photo(message.chat.id, "couple.png"); await message.delete(); os.remove("couple.png")
+
+# ======== NEW LOGO COMMAND ========
+@app.on_message(filters.me & filters.command("logo"))
+async def logo_gen(client, message: Message):
+    args = message.text.split()[1:]
+
+    if len(args) == 0:
+        return await message.edit("**Use:** `/logo boy Kartik` ya `/logo girl Ishika`")
+
+    # Gender check
+    if args[0].lower() in ["boy", "b", "ladka"]:
+        gender = "boy"
+        name = " ".join(args[1:])
+    elif args[0].lower() in ["girl", "g", "ladki"]:
+        gender = "girl"
+        name = " ".join(args[1:])
+    else:
+        gender = "girl" # default
+        name = " ".join(args)
+
+    if not name:
+        return await message.edit("**Naam kaha hai bhai?** ` /logo boy Aryan`")
+
+    wait_msg = await message.edit(f"**{name} ke liye anime logo bana raha hu...** ✨")
+
+    try:
+        # 1. Auto AI se anime bg generate
+        if gender == "boy":
+            prompt = f"anime boy character portrait, aesthetic background, glowing, cinematic, high quality"
+        else:
+            prompt = f"anime girl character portrait, aesthetic background, glowing, flowers, high quality"
+
+        api_url = f"https://image.pollinations.ai/prompt/{prompt}?width=1024&height=1024&seed={random.randint(1,99999)}&nologo=true"
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get(api_url) as resp:
+                if resp.status!= 200:
+                    return await wait_msg.edit("**API error aa gaya** 😔")
+                img_bytes = await resp.read()
+
+        # 2. Naam image pe likhenge
+        img = Image.open(BytesIO(img_bytes)).convert("RGB")
+        draw = ImageDraw.Draw(img)
+
+        try:
+            font = ImageFont.truetype("arial.ttf", 100) # arial.ttf bot folder me daal dena
+        except:
+            font = ImageFont.load_default()
+
+        # Text center bottom me
+        text_w, text_h = draw.textbbox((0,0), name, font=font)[2:]
+        x = (img.width - text_w) / 2
+        y = img.height - 180
+
+        # Glow effect
+        for i in range(1, 5):
+            draw.text((x+i, y+i), name, font=font, fill="black")
+        draw.text((x, y), name, font=font, fill="white")
+
+        # Save
+        output_path = f"logo_{name}.jpg"
+        img.save(output_path)
+
+        await wait_msg.delete()
+        await message.reply_photo(
+            photo=output_path,
+            caption=f"**✨ {name} ka Anime Logo Ready ✨**\n**Gender:** {gender.capitalize()}"
+        )
+        os.remove(output_path)
+
+    except Exception as e:
+        await wait_msg.edit(f"**Error:** `{e}`")
+# ===================================
 
 @app.on_message(filters.me & filters.command("tts"))
 async def tts_cmd(client, message: Message):
@@ -197,16 +318,13 @@ async def tagsh(client, message: Message):
     global tagsh_active
     chat_id = message.chat.id
     tagsh_active[chat_id] = True
-
     await message.edit("🚀 **TAGSH STARTED**\nHar member ko alag shayari ke sath tag kar raha hu...")
 
     shayari_copy = SHAYARI_LIST.copy()
     random.shuffle(shayari_copy)
-
     i = 0
     async for member in client.get_chat_members(chat_id):
-        if not tagsh_active.get(chat_id):
-            break
+        if not tagsh_active.get(chat_id): break
         if member.user and not member.user.is_bot and not member.user.is_deleted:
             shayari = shayari_copy[i % len(shayari_copy)]
             text = f"[{member.user.first_name}](tg://user?id={member.user.id})\n\n{shayari}"
@@ -214,11 +332,8 @@ async def tagsh(client, message: Message):
                 await client.send_message(chat_id, text)
                 i += 1
                 await asyncio.sleep(4)
-            except FloodWait as e:
-                await asyncio.sleep(e.value)
-            except:
-                pass
-
+            except FloodWait as e: await asyncio.sleep(e.value)
+            except: pass
     tagsh_active[chat_id] = False
     await client.send_message(chat_id, "✅ **TAGSH COMPLETED**\nSabko tag kar diya")
 
@@ -308,5 +423,5 @@ async def dcast(client, message: Message):
             await asyncio.sleep(4)
     await message.edit(f"✅ Sent to {sent} users")
 
-print("ISHIKA USERBOT V1.6 FULL STARTED ✅")
+print("ISHIKA USERBOT V1.8 LOGO STARTED ✅")
 app.run()
