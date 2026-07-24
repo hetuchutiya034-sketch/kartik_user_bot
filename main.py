@@ -293,7 +293,15 @@ async def translate(client, message: Message):
 @app.on_message(filters.me & filters.command("weather"))
 async def weather(client, message: Message):
     if len(message.command) < 2: return await message.edit("Use: /weather Pune")
-    await message.edit(f"🌤️ `{requests.get(f'https://wttr.in/{' '.join(message.command[1:])}?format=3').text}`")
+    
+    city = " ".join(message.command[1:])
+    url = f"https://wttr.in/{city}?format=3"
+    
+    try:
+        res = requests.get(url).text
+        await message.edit(f"🌤️ `{res}`")
+    except:
+        await message.edit("**City nahi mili** 😔")
 
 @app.on_message(filters.me & filters.command("joke"))
 async def joke(client, message: Message): await message.edit(random.choice(JOKES))
