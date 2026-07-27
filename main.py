@@ -1,435 +1,142 @@
 from pyrogram import Client, filters
-from pyrogram.types import Message, ChatPrivileges, InlineKeyboardMarkup, InlineKeyboardButton
-from pyrogram.errors import FloodWait, ChatWriteForbidden
-import asyncio, os, random, requests
-from gtts import gTTS
-import speech_recognition as sr
-from googletrans import Translator
-from PIL import Image, ImageDraw, ImageFont
-from io import BytesIO
-import yt_dlp
-import aiohttp # <-- logo ke liye add kiya
+from pyrogram.types import *
+from pyrogram.errors import FloodWait
+import asyncio, os, random
 
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
 SESSION = os.getenv("SESSION")
 
 app = Client("ishikauserbot", api_id=API_ID, api_hash=API_HASH, session_string=SESSION)
-translator = Translator()
-recognizer = sr.Recognizer()
-tagging = False
-tagsh_active = {} # tagsh ke liye
-welcome_on = {}
 
-# ============= SETTINGS =============
-SUPPORT_GROUP = "https://t.me/+AAB-iIMnebBmMWZl" 
-UPDATE_CHANNEL = "https://t.me/+AAB-iIMnebBmMWZl" 
-DM_USERNAME = "https://t.me/KARTIK_NISHAD_3" 
+# ===== GLOBAL BUTTONS =====
+def buttons():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🚀 Deploy", callback_data="deploy")],
+        [InlineKeyboardButton("✅ Available", callback_data="available")],
+        [InlineKeyboardButton("📢 Updates", url="https://t.me/")],
+        [InlineKeyboardButton("💬 Owner", url="https://t.me/")]
+    ])
 
-# ============= DATA =============
-SHAYARI_LIST = [
-"मुझे वो पहली मुलाकात दे दो \nखुशनुमा वो फिर हालात दे दो....\n\nबात करते सो जाते थे \nफिर से मुझे वो अपनी रात दे दो...\n\nमैं उड़ती फिरती थी पूरा दिन \nफिर से मुझे वो मेरे जज़्बात दे दो....\nअब तुम बदल गए हो जाना\nफिर से मुझे वो पहली मुलाकात दे दो...!! ✍🏻❤💕🥺😥😞||",
+# ===== CALLBACK =====
+@app.on_callback_query()
+async def cb(client, q):
+    if q.data == "deploy":
+        await q.answer("🚀 Bot already deployed!", show_alert=True)
+    elif q.data == "available":
+        await q.answer("✅ All systems working!", show_alert=True)
 
-"𝗬𝗲 𝗿𝗶𝘀𝘁𝗼𝗻 𝗸𝗲 𝘀𝗶𝗹𝘀𝗶𝗹𝗲 𝗶𝘁𝗻𝗲 𝗮𝗷𝗲𝗯 𝗸𝘆𝘂 𝗵𝗮𝗶\n𝗝𝗼 𝗻𝗮𝘀𝗶𝗯 𝗺𝗲 𝗻𝗵𝗶 𝘄𝗮𝗵𝗶 𝗱𝗶𝗹 𝗸𝗲 𝗸𝗮𝗿𝗶𝗯 𝗸𝘆𝘂 𝗵𝗮𝗶\n𝗡𝗮 𝗷𝗮𝗻𝗲 𝗸𝗮𝗶𝘀𝗲 𝗺𝗶𝗹 𝗷𝗮𝘁𝗶 𝗵𝗮𝗶 𝗹𝗼𝗴𝗼 𝗸𝗼 𝘂𝗻𝗸𝗶 𝗰𝗵𝗮𝗵𝗮𝘁\n𝗔𝗮𝗸𝗵𝗶𝗿 𝗸𝗶𝘀𝗲 𝗽𝘂𝗰𝗵𝗲𝗻 𝗸𝗶 𝗵𝘂𝗺 𝗶𝘁𝗻𝗲 𝗯𝗮𝗱𝗻𝗮𝘀𝗲𝗯 𝗸𝘆𝘂 𝗵𝗮𝗶 ||\n✍️ KARTIK ✍️",
-
-"𝗧𝘂𝗺 𝗺𝘂𝗷𝗵𝗲 𝗰𝗵𝗼𝗿 𝗴𝘆𝗲 𝗸𝗼𝗶 𝗯𝗮𝘁 𝗻𝗵𝗶\n𝗔𝗽𝗻𝗲 𝘄𝗮𝗱𝗼𝗻 𝘀𝗲 𝗺𝘂𝗵 𝗺𝗼𝗱 𝗴𝘆𝗲 𝗸𝗼𝗶 𝗯𝗮𝘁 𝗻𝗵𝗶\n𝗠𝗲𝗿𝗮 𝗱𝗶𝗹 𝘁𝗼 𝘄𝗲𝘀𝗲 𝗵𝗶 𝗸𝗵𝗶𝗹𝗼𝗻𝗮 𝘁𝗵𝗮\n𝗲𝗸 𝗸𝗵𝗶𝗹𝗼𝗻𝗮 𝗵𝗶 𝘁𝗼𝗱 𝗴𝘆𝗲 𝗸𝗼𝗶 𝗯𝗮𝘁 𝗻𝗶 ||\n✍️ KARTIK ✍️",
-
-"ʟᴏɢ ᴍɪʟ ᴊᴀᴛᴇ ʜᴀɪ ᴋᴀʜᴀɴɪ ʙᴀɴᴋᴀʀ\nᴅɪʟ ᴍᴇ ʙᴀs ᴊᴀᴛᴇ ʜᴀɪ ɴɪsʜᴀɴɪ ʙᴀɴᴋᴀʀ\nᴊɪɴʜᴇ ʜᴀᴍ ʀᴀᴋʜɴᴀ ᴄʜᴀʜᴛᴇ ʜᴀɪ ᴀᴘɴɪ ᴀᴀɴᴋʜᴏɴ ᴍᴇ \nᴋʏᴜ ɴɪᴋᴀʟ ᴊᴀᴛᴇ ʜᴀɪ ᴡᴏ ᴘᴀɴɪ ʙᴀɴᴋᴀʀ ||\n✍️ KARTIK ✍️",
-
-"कहानी जिंदगी की यही है जनाब कि....!!!!\nइसमें मनचाहा किरदार नहीं मिलता....!!!!\n\nइन अल्फाजों से अपने आप को सलामत रखना \nजब कोई कहे न हमेशा तुम्हारा साथ हु।\nउसे एक सावल करना? कब तक?!\nकिसी ने मुझसे यही कहा था।\nआज जब उसे ढूंढा तो उसके अलावा सब मिला पर वो नहीं मिला ||",
-
-"Wo khush hai parr Shayaad humse nahi,\nWo naraaz hai parr Shayaad humse nahi,\nKon kehta hai ki unke Dil mein mohabbat nahi,\nMohabbat hai parr Shayaad humse nahi ||",
-
-"उसने सारी कुदरत को बुलाया होगा, फिर उसमें ममता का अक्स समाया होगा, \nकोशिश होगी परियों को जमीन पर लाने की, \nतब जाके खुदा ने बहनों को बनाया होगा ||",
-
-"He Mohabbat use bhi he magar izhaar nahi karti \nab ye Kahna bhi to galat hai na ki vo mujhse pyar nhi karti \nMujhe khone ke dar se ki vah Meri hone se bhi darti hai \nVarna vo mere izhaar per Inkar nahin karti ||\n✍ KARTIK ✍",
-
-"Tu zaruri hai har zarurat ko aazmaane ke baad...👈🏻🥀\nTu chalaana marzi apni mere marjane ke baad....!!\n\nHai sitam yeh bhi ke hum use chahte hai....🫶🏻🥹\nWoh bhi itna sitam dhaane ke baad...!!",
-
-"Woh kitna khaas hai mere liye use batau kaise?\nMere dil me jo pyar hai uske liye woh jatau kaise?\nWoh rehta h koso dur mujh se, use dekh kr muskurau kaise?\nYeh pyar ek tarfa hi shi, pr pyar toh hai, bhul jau kaise?\nMain likhti hu bs usi ke liye pr usse sunau kaise?\nWoh rootha toh h pr kisi aur k liye main manana bhi chahu toh manau kaise || ✨",
-
-"Mere dil ke dard ko kisne dekha haiii..\nMujhe Bus Khuda ne tadapte dekha hai..\nHum Tanhai mei baithe Rote hue...😌\nLogo ne Hume Mehfil mei Haste dekha hai.....🥀 ||",
-
-"Mujhko sambhal aur khud bhi sambal \nMai nashe mein hu\nAaye jaan e jigar saath mai chal \nMai nashe mein hu\nOr akbar bhi mai saleem bhi mai hi shahjaha hu\nLakhon bana du taj mahal\nKyuki Mai nashe mein hu ||",
-
-"Wo Dur Mujhse Kahi Hai Chalo Ji Ye Bhi Sahi\nHaan Hain or Bhi Husn Jamane Me\nPar Mujhe Pasand Sirf Vahi Hai ||",
-
-"𝙳𝚒𝚕 𝚔𝚒 𝚋𝚊𝚝𝚎𝚒𝚗 💗:\nMere kandhe par Sir rakh kr us aasmaan ko dekh \nBilkul tere jaisa dikhta hai us chand ko dekh\nMujhe to hr ak cheez mai tera chehra nazar aata hai\nKabhi tu meri nazron se is jhaan ko dekh ||",
-
-"Jiski ho jaisi ho chahe joh bhi ho tum \nMere liye toh meri ho bas meri ho tum\nSocha tha rounga gale se lipatkar tumare \nKhair yeh sab chordo aur batao Kaisi ho Tum ||",
-
-"शोर बहुत है मगर सुनाई नही देगा!!\nदर्द दिल का चेहरे पर दिखाई नही देगा!!\nएक तुझसे बनाने के लिए मैंने बिगाड़ लि सबसे!!\nतो मेरे हक में भी कोई गवाही नहीं देगा ||",
-
-"Ki kisi ki yaad me rona fizul h\nAur itne anmol ansu khona fizul h\nAur rona h to unke liye roo jo tum p nisar h\nUnke liye kya rona jinke ashique hazar h ||"
-]
-
-FLIRT = [
-    "Tum haste ho to dil garden ho jata hai 😍",
-    "Tum chai ho aur main biscuit, sath me mast lagte hai",
-    "Teri ek jhalak dekhne ko dil taras jata hai"
-]
-
-WELCOMES = [
-    "✨ **NEW MEMBER ALERT** ✨\n\n**Name:** {name}\n**ID:** `{id}`\n**Username:** @{username}\n\n**Welcome to {chat}** 💎\nTumhare aane se group me rounak aa gayi 😍",
-    "🔥 **SWAG WELCOME** 🔥\n\nHey [{name}](tg://user?id={id}) baby 😈\n**ID:** `{id}`\n**@:** @{username}\n\n**{chat}** me dil se swagat hai ❤️"
-]
-
-JOKES = [
-    "Teacher: 2+2? Student: 5. Teacher: Galat. Student: Aapke hisab se 😂",
-    "Doctor: Neend nahi aati? Patient: Nahi. Doctor: To so jao 😂"
-]
-MEMES = ["Jab crush online aaye", "Monday morning vibes", "Exam ke 1 din pehle"]
-
-# ============= BASIC =============
+# ===== BASIC =====
 @app.on_message(filters.me & filters.command("ping"))
-async def ping(client, message: Message): await message.edit("🏓 Pong! Bot zinda hai")
+async def ping(_, m):
+    await m.edit("🏓 Pong!", reply_markup=buttons())
 
 @app.on_message(filters.me & filters.command("help"))
-async def help(client, message: Message):
-    text = """🔥 **ISHIKA USERBOT V1.8 LOGO UPDATE** 🔥
+async def help(_, m):
+    await m.edit("""
+🔥 KING USERBOT 🔥
 
-**Tag/Admin:** `/tagall` `/cancel` `/tagsh` `/stoptagsh` `/promote` `/demote` `/ban` `/unban` `/mute` `/unmute`
-**Extra Admin:** `/kick` `/warn` `/zombies`
-**Info:** `/id` `/info` `/purge`
-**Broadcast:** `/broadcast` `/gcast` `/dcast`
-**AI/Fun:** `/imagine` `/anime` `/couple` `/logo` `/tts` `/shayari` `/flirt` `/joke` `/meme`
-**New Tools:** `/insta` `/stt` `/tr` `/weather`
-**Group:** `/welcome on/off`
-**Session:** `/string`"""
-    await message.edit(text)
+.cat .rose .hacker .error .fuck .butterfly  
+.yourmom .myson .love  
 
-@app.on_message(filters.me & filters.command("string"))
-async def gen_string(client, message: Message):
-    await message.edit(f"**String Session:**\n`{SESSION}`")
+.clone .back  
+.tagall .allban .stop  
 
-# ============= WELCOME PREMIUM =============
-@app.on_message(filters.me & filters.command("welcome") & filters.group)
-async def welcome_toggle(client, message: Message):
-    global welcome_on
-    if len(message.command) < 2:
-        return await message.edit("Use: `/welcome on` or `/welcome off`")
-    welcome_on[message.chat.id] = True if message.command[1] == "on" else False
-    await message.edit(f"✅ Welcome {'ON' if welcome_on[message.chat.id] else 'OFF'}")
+.aanysnap = auto reply  
+""", reply_markup=buttons())
 
-@app.on_message(filters.group & filters.new_chat_members)
-async def welcome(client, message: Message):
-    if not welcome_on.get(message.chat.id, True):
-        return
-    for user in message.new_chat_members:
-        if user.is_self:
-            continue
+# ===== KING COMMANDS =====
+@app.on_message(filters.me & filters.command("cat"))
+async def cat(_, m): await m.edit("🐱 Meow 😺", reply_markup=buttons())
 
-        chat = await client.get_chat(message.chat.id)
-        username = user.username if user.username else "NoUsername"
+@app.on_message(filters.me & filters.command("rose"))
+async def rose(_, m): await m.edit("🌹 Rose ❤️", reply_markup=buttons())
 
-        # User DP
-        photos = [p async for p in client.get_chat_photos(user.id, limit=1)]
-        photo = photos[0].file_id if photos else None
+@app.on_message(filters.me & filters.command("hacker"))
+async def hacker(_, m): await m.edit("💻 Hacking...\nAccess Granted ✅", reply_markup=buttons())
 
-        # Welcome text
-        wel = random.choice(WELCOMES).format(
-            name=user.first_name,
-            id=user.id,
-            username=username,
-            chat=chat.title
-        )
+@app.on_message(filters.me & filters.command("error"))
+async def error(_, m): await m.edit("⚠️ System Crash!", reply_markup=buttons())
 
-        # 4 Buttons
-        buttons = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🛡️ Support Group", url=SUPPORT_GROUP)],
-            [InlineKeyboardButton("📢 Update Channel", url=UPDATE_CHANNEL)],
-            [InlineKeyboardButton("💬 DM Me", url=DM_USERNAME)],
-            [InlineKeyboardButton("📖 Help & Commands", callback_data="help")]
-        ])
+@app.on_message(filters.me & filters.command("fuck"))
+async def fuck(_, m): await m.edit("🖕", reply_markup=buttons())
 
-        if photo:
-            await client.send_photo(message.chat.id, photo=photo, caption=wel, reply_markup=buttons)
-        else:
-            await client.send_message(message.chat.id, wel, reply_markup=buttons)
+@app.on_message(filters.me & filters.command("butterfly"))
+async def butterfly(_, m): await m.edit("🦋 Butterfly Mode", reply_markup=buttons())
 
-@app.on_callback_query(filters.regex("help"))
-async def help_button(client, callback_query):
-    text = """🔥 **ISHIKA USERBOT COMMANDS** 🔥
+@app.on_message(filters.me & filters.command("yourmom"))
+async def yourmom(_, m): await m.edit("😂 Mom roast activated", reply_markup=buttons())
 
-**Tag/Admin:** `/tagall` `/cancel` `/tagsh` `/stoptagsh`
-**Extra:** `/promote` `/demote` `/ban` `/unban` `/mute` `/unmute` `/kick` `/warn`
-**Info:** `/id` `/info` `/purge`
-**Fun/AI:** `/shayari` `/flirt` `/joke` `/meme` `/imagine` `/anime` `/couple` `/logo` `/tts`
-**Tools:** `/insta` `/stt` `/tr` `/weather`
-**Group:** `/welcome on/off`
-**Broadcast:** `/broadcast` `/gcast` `/dcast`"""
-    await callback_query.answer(text, show_alert=True)
+@app.on_message(filters.me & filters.command("myson"))
+async def myson(_, m): await m.edit("👨‍👦 Me & My Son", reply_markup=buttons())
 
-# ============= AI & MEDIA =============
-@app.on_message(filters.me & filters.command("imagine"))
-async def imagine(client, message: Message):
-    if len(message.command) < 2: return await message.edit("Use: /imagine beautiful girl")
-    await message.edit("🎨 Image bana raha hu...")
-    img = Image.new('RGB', (512, 512), (73, 109, 137)); ImageDraw.Draw(img).text((10,250), " ".join(message.command[1:])[:30], fill=(255,255,0))
-    img.save("img.png"); await client.send_photo(message.chat.id, "img.png"); await message.delete(); os.remove("img.png")
+@app.on_message(filters.me & filters.command("love"))
+async def love(_, m): await m.edit("❤️ Love 💫", reply_markup=buttons())
 
-@app.on_message(filters.me & filters.command("anime"))
-async def anime_logo(client, message: Message):
-    if len(message.command) < 2: return await message.edit("Use: /anime Ishika")
-    await message.edit("🎨 Anime logo...")
-    img = Image.open(BytesIO(requests.get("https://i.imgur.com/3Z3jW3Q.jpg").content)).resize((512,512))
-    ImageDraw.Draw(img).text((256,400), " ".join(message.command[1:])[:12], fill=(255,50,150), anchor="mm")
-    img.save("anime.png"); await client.send_photo(message.chat.id, "anime.png"); await message.delete(); os.remove("anime.png")
+# ===== AUTO REPLY =====
+auto_reply = False
 
-@app.on_message(filters.me & filters.command("couple"))
-async def couple_logo(client, message: Message):
-    if len(message.command) < 3: return await message.edit("Use: /couple boy girl")
-    await message.edit("💑 Couple logo...")
-    img = Image.open(BytesIO(requests.get("https://i.imgur.com/8QfZ3pL.jpg").content)).resize((512,512))
-    ImageDraw.Draw(img).text((256,420), f"{message.command[1]} ❤️ {message.command[2]}", fill=(255,20,147), anchor="mm")
-    img.save("couple.png"); await client.send_photo(message.chat.id, "couple.png"); await message.delete(); os.remove("couple.png")
+@app.on_message(filters.me & filters.command("aanysnap"))
+async def auto(_, m):
+    global auto_reply
+    auto_reply = not auto_reply
+    await m.edit(f"Auto Reply {'ON' if auto_reply else 'OFF'}", reply_markup=buttons())
 
-# ======== NEW LOGO COMMAND ========
-@app.on_message(filters.me & filters.command("logo"))
-async def logo_gen(client, message: Message):
-    args = message.text.split()[1:]
+@app.on_message(filters.text & ~filters.me)
+async def reply_all(client, m):
+    if auto_reply:
+        await m.reply("⚡ Auto Reply Active", reply_markup=buttons())
 
-    if len(args) == 0:
-        return await message.edit("**Use:** `/logo boy Kartik` ya `/logo girl Ishika`")
+# ===== CLONE =====
+backup = {}
 
-    # Gender check
-    if args[0].lower() in ["boy", "b", "ladka"]:
-        gender = "boy"
-        name = " ".join(args[1:])
-    elif args[0].lower() in ["girl", "g", "ladki"]:
-        gender = "girl"
-        name = " ".join(args[1:])
-    else:
-        gender = "girl" # default
-        name = " ".join(args)
+@app.on_message(filters.me & filters.command("clone"))
+async def clone(client, m):
+    user = m.reply_to_message.from_user
+    me = await client.get_me()
+    backup["name"] = me.first_name
+    await client.update_profile(first_name=user.first_name)
+    await m.edit("👥 Cloned", reply_markup=buttons())
 
-    if not name:
-        return await message.edit("**Naam kaha hai bhai?** ` /logo boy Aryan`")
+@app.on_message(filters.me & filters.command("back"))
+async def back(client, m):
+    if backup:
+        await client.update_profile(first_name=backup["name"])
+        await m.edit("🔄 Restored", reply_markup=buttons())
 
-    wait_msg = await message.edit(f"**{name} ke liye anime logo bana raha hu...** ✨")
+# ===== TAG ALL =====
+running = True
 
-    try:
-        # 1. Auto AI se anime bg generate
-        if gender == "boy":
-            prompt = f"anime boy character portrait, aesthetic background, glowing, cinematic, high quality"
-        else:
-            prompt = f"anime girl character portrait, aesthetic background, glowing, flowers, high quality"
-
-        api_url = f"https://image.pollinations.ai/prompt/{prompt}?width=1024&height=1024&seed={random.randint(1,99999)}&nologo=true"
-
-        async with aiohttp.ClientSession() as session:
-            async with session.get(api_url) as resp:
-                if resp.status!= 200:
-                    return await wait_msg.edit("**API error aa gaya** 😔")
-                img_bytes = await resp.read()
-
-        # 2. Naam image pe likhenge
-        img = Image.open(BytesIO(img_bytes)).convert("RGB")
-        draw = ImageDraw.Draw(img)
-
-        try:
-            font = ImageFont.truetype("arial.ttf", 100) # arial.ttf bot folder me daal dena
-        except:
-            font = ImageFont.load_default()
-
-        # Text center bottom me
-        text_w, text_h = draw.textbbox((0,0), name, font=font)[2:]
-        x = (img.width - text_w) / 2
-        y = img.height - 180
-
-        # Glow effect
-        for i in range(1, 5):
-            draw.text((x+i, y+i), name, font=font, fill="black")
-        draw.text((x, y), name, font=font, fill="white")
-
-        # Save
-        output_path = f"logo_{name}.jpg"
-        img.save(output_path)
-
-        await wait_msg.delete()
-        await message.reply_photo(
-            photo=output_path,
-            caption=f"**✨ {name} ka Anime Logo Ready ✨**\n**Gender:** {gender.capitalize()}"
-        )
-        os.remove(output_path)
-
-    except Exception as e:
-        await wait_msg.edit(f"**Error:** `{e}`")
-# ===================================
-
-@app.on_message(filters.me & filters.command("tts"))
-async def tts_cmd(client, message: Message):
-    if len(message.command) < 2: return await message.edit("Use: /tts hello")
-    gTTS(" ".join(message.command[1:]), lang='hi').save("voice.ogg")
-    await client.send_voice(message.chat.id, "voice.ogg"); await message.delete(); os.remove("voice.ogg")
-
-# ============= NEW FILES =============
-@app.on_message(filters.me & filters.command("shayari"))
-async def shayari_unlimited(client, message: Message): await message.edit(random.choice(SHAYARI_LIST))
-
-@app.on_message(filters.me & filters.command("flirt"))
-async def flirt_cmd(client, message: Message): await message.edit(random.choice(FLIRT))
-
-@app.on_message(filters.me & filters.command("insta"))
-async def insta_dl(client, message: Message):
-    if len(message.command) < 2: return await message.edit("Use: /insta reel_link")
-    await message.edit("📥 Downloading...")
-    with yt_dlp.YoutubeDL({'outtmpl': 'insta.%(ext)s'}) as ydl: ydl.download([message.command[1]])
-    await client.send_video(message.chat.id, "insta.mp4"); await message.delete(); os.remove("insta.mp4")
-
-@app.on_message(filters.me & filters.command("stt"))
-async def stt(client, message: Message):
-    if not message.reply_to_message or not message.reply_to_message.voice: return await message.edit("Reply to voice")
-    file = await client.download_media(message.reply_to_message)
-    with sr.AudioFile(file) as source: text = recognizer.recognize_google(recognizer.record(source), language="hi-IN")
-    await message.edit(f"**Voice to Text:**\n{text}"); os.remove(file)
-
-@app.on_message(filters.me & filters.command("tr"))
-async def translate(client, message: Message):
-    text = " ".join(message.command[1:]) if len(message.command) > 1 else message.reply_to_message.text
-    result = translator.translate(text, dest='hi')
-    await message.edit(f"**Hindi:** {result.text}")
-
-@app.on_message(filters.me & filters.command("weather"))
-async def weather(client, message: Message):
-    if len(message.command) < 2: return await message.edit("Use: /weather Pune")
-    
-    city = " ".join(message.command[1:])
-    url = f"https://wttr.in/{city}?format=3"
-    
-    try:
-        res = requests.get(url).text
-        await message.edit(f"🌤️ `{res}`")
-    except:
-        await message.edit("**City nahi mili** 😔")
-
-@app.on_message(filters.me & filters.command("joke"))
-async def joke(client, message: Message): await message.edit(random.choice(JOKES))
-
-@app.on_message(filters.me & filters.command("meme"))
-async def meme(client, message: Message): await message.edit(f"😂 **Meme:** {random.choice(MEMES)}")
-
-# ============= ADMIN ALL =============
 @app.on_message(filters.me & filters.command("tagall"))
-async def tagall(client, message: Message):
-    global tagging; tagging=True; msg=" ".join(message.command[1:]); await message.delete()
-    for user in [m.user async for m in client.get_chat_members(message.chat.id) if m.user and not m.user.is_bot]:
-        if not tagging: break
-        await client.send_message(message.chat.id, f"[{user.first_name}](tg://user?id={user.id}) {msg}"); await asyncio.sleep(5)
+async def tagall(client, m):
+    global running
+    running = True
+    await m.delete()
 
-@app.on_message(filters.me & filters.command("cancel"))
-async def cancel_tag(client, message: Message): global tagging; tagging=False; await message.edit("Stopped")
+    async for u in client.get_chat_members(m.chat.id):
+        if not running: break
+        try:
+            await client.send_message(m.chat.id, f"[{u.user.first_name}](tg://user?id={u.user.id}) hi")
+            await asyncio.sleep(2)
+        except:
+            pass
 
-# ============= TAGSH COMMAND NEW =============
-@app.on_message(filters.me & filters.command("tagsh") & filters.group)
-async def tagsh(client, message: Message):
-    global tagsh_active
-    chat_id = message.chat.id
-    tagsh_active[chat_id] = True
-    await message.edit("🚀 **TAGSH STARTED**\nHar member ko alag shayari ke sath tag kar raha hu...")
+@app.on_message(filters.me & filters.command("stop"))
+async def stop(_, m):
+    global running
+    running = False
+    await m.edit("🛑 Stopped", reply_markup=buttons())
 
-    shayari_copy = SHAYARI_LIST.copy()
-    random.shuffle(shayari_copy)
-    i = 0
-    async for member in client.get_chat_members(chat_id):
-        if not tagsh_active.get(chat_id): break
-        if member.user and not member.user.is_bot and not member.user.is_deleted:
-            shayari = shayari_copy[i % len(shayari_copy)]
-            text = f"[{member.user.first_name}](tg://user?id={member.user.id})\n\n{shayari}"
-            try:
-                await client.send_message(chat_id, text)
-                i += 1
-                await asyncio.sleep(4)
-            except FloodWait as e: await asyncio.sleep(e.value)
-            except: pass
-    tagsh_active[chat_id] = False
-    await client.send_message(chat_id, "✅ **TAGSH COMPLETED**\nSabko tag kar diya")
+# ===== ALL BAN (SAFE) =====
+@app.on_message(filters.me & filters.command("allban"))
+async def allban(client, m):
+    await m.edit("🔨 Banning...")
+    async for u in client.get_chat_members(m.chat.id):
+        try:
+            await client.ban_chat_member(m.chat.id, u.user.id)
+            await asyncio.sleep(0.5)
+        except:
+            pass
 
-@app.on_message(filters.me & filters.command("stoptagsh"))
-async def stoptagsh(client, message: Message):
-    global tagsh_active
-    tagsh_active[message.chat.id] = False
-    await message.edit("⛔ **TAGSH STOPPED**")
-
-@app.on_message(filters.me & filters.command("promote"))
-async def promote(client, message: Message):
-    await client.promote_chat_member(message.chat.id, message.reply_to_message.from_user.id, privileges=ChatPrivileges(can_manage_chat=True,can_delete_messages=True,can_restrict_members=True,can_invite_users=True,can_pin_messages=True))
-    await message.edit("✅ Promoted")
-
-@app.on_message(filters.me & filters.command("demote"))
-async def demote(client, message: Message):
-    await client.promote_chat_member(message.chat.id, message.reply_to_message.from_user.id, privileges=ChatPrivileges())
-    await message.edit("✅ Demoted")
-
-@app.on_message(filters.me & filters.command("ban"))
-async def ban(client, message: Message): await client.ban_chat_member(message.chat.id, message.reply_to_message.from_user.id); await message.edit("✅ Banned")
-@app.on_message(filters.me & filters.command("unban"))
-async def unban(client, message: Message): await client.unban_chat_member(message.chat.id, message.reply_to_message.from_user.id); await message.edit("✅ Unbanned")
-@app.on_message(filters.me & filters.command("mute"))
-async def mute(client, message: Message): await client.restrict_chat_member(message.chat.id, message.reply_to_message.from_user.id); await message.edit("🔇 Muted")
-@app.on_message(filters.me & filters.command("unmute"))
-async def unmute(client, message: Message): await client.restrict_chat_member(message.chat.id, message.reply_to_message.from_user.id, permissions=message.chat.permissions); await message.edit("🔊 Unmuted")
-
-@app.on_message(filters.me & filters.command("kick"))
-async def kick(client, message: Message):
-    await client.ban_chat_member(message.chat.id, message.reply_to_message.from_user.id)
-    await client.unban_chat_member(message.chat.id, message.reply_to_message.from_user.id)
-    await message.edit("👢 Kicked")
-
-@app.on_message(filters.me & filters.command("warn"))
-async def warn(client, message: Message):
-    await message.edit(f"⚠️ **Warning**\n{message.reply_to_message.from_user.first_name} agli baar ban")
-
-@app.on_message(filters.me & filters.command("zombies"))
-async def zombies(client, message: Message):
-    count=0
-    async for m in client.get_chat_members(message.chat.id):
-        if m.user.is_deleted: await client.ban_chat_member(message.chat.id,m.user.id); await client.unban_chat_member(message.chat.id,m.user.id); count+=1
-    await message.edit(f"✅ {count} Zombies deleted")
-
-# ============= INFO & BROADCAST =============
-@app.on_message(filters.me & filters.command("id"))
-async def get_id(client, message: Message): await message.edit(f"Chat ID: `{message.chat.id}`\nYour ID: `{message.from_user.id}`")
-
-@app.on_message(filters.me & filters.command("info"))
-async def userinfo(client, message: Message):
-    u=message.reply_to_message.from_user; await message.edit(f"**Name:** {u.first_name}\n**Username:** @{u.username}\n**ID:** `{u.id}`")
-
-@app.on_message(filters.me & filters.command("purge"))
-async def purge(client, message: Message):
-    for i in range(message.reply_to_message.id, message.id):
-        try: await client.delete_messages(message.chat.id, i)
-        except: pass
-    await message.reply("✅ Purged")
-
-@app.on_message(filters.me & filters.command("broadcast"))
-async def broadcast(client, message: Message):
-    msg=" ".join(message.command[1:]); sent=0
-    async for d in client.get_dialogs():
-        try: await client.send_message(d.chat.id, f"📢 {msg}"); sent+=1
-        except: pass
-        await asyncio.sleep(4)
-    await message.edit(f"✅ Sent to {sent} chats")
-
-@app.on_message(filters.me & filters.command("gcast"))
-async def gcast(client, message: Message):
-    msg=" ".join(message.command[1:]); sent=0
-    async for d in client.get_dialogs():
-        if d.chat.type in ["group","supergroup"]:
-            try: await client.send_message(d.chat.id, f"📢 {msg}"); sent+=1
-            except: pass
-            await asyncio.sleep(4)
-    await message.edit(f"✅ Sent to {sent} groups")
-
-@app.on_message(filters.me & filters.command("dcast"))
-async def dcast(client, message: Message):
-    msg=" ".join(message.command[1:]); sent=0
-    async for d in client.get_dialogs():
-        if d.chat.type=="private" and not d.chat.is_bot:
-            try: await client.send_message(d.chat.id, f"📢 {msg}"); sent+=1
-            except: pass
-            await asyncio.sleep(4)
-    await message.edit(f"✅ Sent to {sent} users")
-
-print("ISHIKA USERBOT V1.8 LOGO STARTED ✅")
+print("🔥 USERBOT STARTED 🔥")
 app.run()
