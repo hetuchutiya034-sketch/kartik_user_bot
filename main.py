@@ -1,5 +1,6 @@
 from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
+from pyrogram.errors import FloodWait
 import os, asyncio, random
 
 API_ID = int(os.getenv("API_ID"))
@@ -10,16 +11,11 @@ app = Client("deviluserbot", api_id=API_ID, api_hash=API_HASH, session_string=SE
 
 # ================== SETTINGS ==================
 DEVIL_MODE = True
-
-SUPPORT_GROUP = "https://t.me/+AAB-iIMnebBmMWZl"
-UPDATE_CHANNEL = "https://t.me/+AAB-iIMnebBmMWZl"
 OWNER = "https://t.me/KARTIK_NISHAD_3"
 
-# ================== BUTTON ==================
 def devil_buttons():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("🔥 Deploy", url="https://railway.app")],
-        [InlineKeyboardButton("⚡ Available", url="https://t.me")],
         [InlineKeyboardButton("👑 Owner", url=OWNER)]
     ])
 
@@ -30,44 +26,45 @@ async def ping(client, message: Message):
 
 @app.on_message(filters.me & filters.command("help"))
 async def help_cmd(client, message: Message):
-    txt = """
-🔥 ULTRA DEVIL USERBOT 🔥
+    txt = """🔥 ULTRA DEVIL USERBOT 🔥
 
 ⚡ BASIC
-.ping
-.help
-.devil
+.ping - Check bot
+.help - This menu
+.devil - ON/OFF Devil Mode
 
 😂 FUN
 .shayari
 .flirt
 .joke
 
-👥 ADMIN
-.tagall
-.cancel
+👥 GROUP
+.tagall - Tag everyone
+.cancel - Stop tagging
 
-💣 SPECIAL
-.spam
-"""
+💣 SPAM
+.spam [count] [text]"""
     await message.edit(txt, reply_markup=devil_buttons())
 
-# ================== DEVIL MODE ==================
+# ================== DEVIL MODE TOGGLE ==================
 @app.on_message(filters.me & filters.command("devil"))
 async def devil_toggle(client, message: Message):
     global DEVIL_MODE
     DEVIL_MODE = not DEVIL_MODE
-    await message.edit(f"😈 DEVIL MODE {'ON' if DEVIL_MODE else 'OFF'}", reply_markup=devil_buttons())
+    status = "ON 😈" if DEVIL_MODE else "OFF 🛑"
+    await message.edit(f"DEVIL MODE {status}", reply_markup=devil_buttons())
 
-# ================== AUTO DEVIL REPLY ==================
-@app.on_message(filters.me & filters.text)
+# ================== AUTO DEVIL REPLY ================== FIXED
+@app.on_message(filters.incoming & filters.text & ~filters.bot & ~filters.me)
 async def auto_reply(client, message: Message):
     if DEVIL_MODE:
         try:
-            await message.reply(
-                f"😈 DEVIL MODE ACTIVE\n\n{message.text}",
-                reply_markup=devil_buttons()
-            )
+            replies = [
+                f"😈 Devil: {message.text}",
+                f"🔥 Bolo kya baat hai? {message.text}",
+                f"😈 Haan? {message.text}"
+            ]
+            await message.reply(random.choice(replies), reply_markup=devil_buttons())
         except:
             pass
 
@@ -77,30 +74,22 @@ SHAYARI = [
     "मोहब्बत है तुमसे ❤️",
     "तुम बहुत खास हो 😍"
 ]
-
-FLIRT = [
-    "Tum cute ho 😍",
-    "Tumse baat karke accha lagta hai ❤️"
-]
-
-JOKES = [
-    "Teacher: 2+2? Student: 5 😂",
-    "Doctor: सो जाओ 😂"
-]
+FLIRT = ["Tum cute ho 😍", "Tumse baat karke accha lagta hai ❤️"]
+JOKES = ["Teacher: 2+2? Student: 5 😂", "Doctor: सो जाओ 😂"]
 
 @app.on_message(filters.me & filters.command("shayari"))
-async def shayari(client, message: Message):
+async def shayari_cmd(client, message: Message):
     await message.edit(random.choice(SHAYARI), reply_markup=devil_buttons())
 
 @app.on_message(filters.me & filters.command("flirt"))
-async def flirt(client, message: Message):
+async def flirt_cmd(client, message: Message):
     await message.edit(random.choice(FLIRT), reply_markup=devil_buttons())
 
 @app.on_message(filters.me & filters.command("joke"))
-async def joke(client, message: Message):
+async def joke_cmd(client, message: Message):
     await message.edit(random.choice(JOKES), reply_markup=devil_buttons())
 
-# ================== TAG ALL ==================
+# ================== TAG ALL ================== FIXED
 tagging = False
 
 @app.on_message(filters.me & filters.command("tagall"))
@@ -108,19 +97,23 @@ async def tagall(client, message: Message):
     global tagging
     tagging = True
     await message.delete()
-
-    async for user in client.get_chat_members(message.chat.id):
-        if not tagging:
-            break
-        try:
-            await client.send_message(
-                message.chat.id,
-                f"[{user.user.first_name}](tg://user?id={user.user.id})",
-                reply_markup=devil_buttons()
-            )
-            await asyncio.sleep(2)
-        except:
-            pass
+    mentions = ""
+    count = 0
+    try:
+        async for member in client.get_chat_members(message.chat.id):
+            if not tagging: break
+            if not member.user.is_bot:
+                mentions += f"[{member.user.first_name}](tg://user?id={member.user.id}) "
+                count += 1
+                if count == 5:
+                    await client.send_message(message.chat.id, mentions, reply_markup=devil_buttons())
+                    mentions = ""
+                    count = 0
+                    await asyncio.sleep(2)
+        if mentions:
+            await client.send_message(message.chat.id, mentions, reply_markup=devil_buttons())
+    except FloodWait as e:
+        await asyncio.sleep(e.value)
 
 @app.on_message(filters.me & filters.command("cancel"))
 async def cancel(client, message: Message):
@@ -128,20 +121,25 @@ async def cancel(client, message: Message):
     tagging = False
     await message.edit("⛔ Tagging Stopped", reply_markup=devil_buttons())
 
-# ================== SPAM ==================
+# ================== SPAM ================== FIXED
 @app.on_message(filters.me & filters.command("spam"))
 async def spam(client, message: Message):
     if len(message.command) < 3:
-        return await message.edit("Use: .spam 5 hello")
-
-    count = int(message.command[1])
+        return await message.edit("Use:.spam 5 hello")
+    try:
+        count = int(message.command[1])
+    except:
+        return await message.edit("Count number me do")
+    if count > 50:
+        return await message.edit("⚠️ Max 50 hi kar sakte ho warna ban ho jaoge")
     text = " ".join(message.command[2:])
-
     await message.delete()
-
     for i in range(count):
-        await client.send_message(message.chat.id, text)
-        await asyncio.sleep(0.3)
+        try:
+            await client.send_message(message.chat.id, text)
+            await asyncio.sleep(0.5) # safe delay
+        except FloodWait as e:
+            await asyncio.sleep(e.value)
 
 # ================== START ==================
 print("🔥 ULTRA DEVIL USERBOT STARTED 🔥")
