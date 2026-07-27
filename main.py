@@ -56,7 +56,7 @@ SHAYARI_LIST = [
 FLIRT = ["Tum haste ho to dil garden ho jata hai 😍", "Tum chai ho aur main biscuit, sath me mast lagte hai", "Teri ek jhalak dekhne ko dil taras jata hai"]
 WELCOMES = [
     "✨ **NEW MEMBER ALERT** ✨\n\n**Name:** {name}\n**ID:** `{id}`\n**Username:** @{username}\n\n**Welcome to {chat}** 💎\nTumhare aane se group me rounak aa gayi 😍",
-    "🔥 **SWAG WELCOME** 🔥\n\nHey [{name}](tg://user?id={id}) baby 😈\n**ID:** `{id}`\n**@:** @{username}\n\n**{chat}** me dil se swagat hai ❤️"
+    "🔥 ** HOT WELCOME** 🔥\n\nHey [{name}](tg://user?id={id}) baby 😈\n**ID:** `{id}`\n**@:** @{username}\n\n**{chat}** me dil se swagat hai ❤️"
 ]
 JOKES = ["Teacher: 2+2? Student: 5. Teacher: Galat. Student: Aapke hisab se 😂", "Doctor: Neend nahi aati? Patient: Nahi. Doctor: To so jao 😂"]
 MEMES = ["Jab crush online aaye", "Monday morning vibes", "Exam ke 1 din pehle"]
