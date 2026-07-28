@@ -158,7 +158,7 @@ async def couple(client, message: Message):
 @app.on_message(filters.me & filters.command("shayari"))
 async def shayari_unlimited(client, message: Message):
     sh = random.choice(SHAYARI_LIST)
-    await message.edit(f"💔 **DARD WALI SHAYARI** 💔\n\n{sh}\n\n`— Ishika Bot | Total: 17`")
+    await message.edit(f"💔 **DARD WALI SHAYARI** 💔\n\n{sh}\n\n`— I FOR YOU ❤️💞🌹`")
 
 # ============= FLIRT =============
 @app.on_message(filters.me & filters.command("flirt"))
