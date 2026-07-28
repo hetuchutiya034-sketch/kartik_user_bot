@@ -1,9 +1,6 @@
-pyrogram
+pyrogram==2.0.106
 tgcrypto
-aiohttp
-requests
-gTTS
-SpeechRecognition
-googletrans==4.0.0-rc1
+python-dotenv
 Pillow
-yt-dlp
+gTTS
+aiohttp
