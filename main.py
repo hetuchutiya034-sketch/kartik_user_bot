@@ -8,7 +8,7 @@ from pyrogram import Client, filters
 from pyrogram.types import Message, ChatPrivileges, InlineKeyboardMarkup, InlineKeyboardButton
 from pyrogram.errors import FloodWait
 from pyrogram.raw.functions.account import UpdateProfile
-from pyrogram.raw.functions.photos import UploadProfilePhoto, DeleteProfilePhotos
+from pyrogram.raw.functions.photos import UploadProfilePhoto # DeleteProfilePhotos hata diya
 import aiohttp
 from PIL import Image, ImageDraw, ImageFont
 from gtts import gTTS
@@ -92,7 +92,7 @@ async def help(client, message: Message):
 
 👑 **INFO & CLONE**
 - `/clone` - DP + Name + Bio copy
-- `/back` - Wapas original
+- `/back` - Wapas original Name/Bio
 
 💞 **FUN & AI**
 - `/shayari` - 17 Dard wali shayari 💔
@@ -134,9 +134,9 @@ async def clone(client, message: Message):
 async def back(client, message: Message):
     global my_name, my_bio
     await message.edit("🔄 **Restoring Original Profile...**")
-    await client.invoke(DeleteProfilePhotos())
+    # DeleteProfilePhotos hata diya kyunki Railway support nahi karta
     await client.invoke(UpdateProfile(first_name=my_name, bio=my_bio or ""))
-    await message.edit("✅ **PROFILE RESTORED** ✅ 👑")
+    await message.edit("✅ **PROFILE RESTORED** ✅ 👑\n`Note: DP manually delete karni padegi`")
 
 # ============= AUTO COUPLE =============
 @app.on_message(filters.me & filters.command("couple"))
