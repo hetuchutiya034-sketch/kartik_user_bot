@@ -332,5 +332,89 @@ async def broadcast(client, message: Message):
         await asyncio.sleep(3)
     await status.edit(f"✅ **BROADCAST DONE** ✅\n**Sent:** {sent}\n**Failed:** {failed}")
 
+
+# ============= BRAILLE ROSE COMMANDS =============
+BRAILLE_ROSE_TEMPLATE = """⣤⢔⣒⠂⣀⣤⣄⣀
+⣴⣿⠋⢠⣟⡼⣷⠼⣆⣼⢇⣿⣄⠱⣄
+⠹⣿⡀⣆⠙⠢⠐⠉⣴⣾⣽⢟⡰⠃
+⠀⠈⢿⣿⣦ ⠤⢴⣿⠿⢋⣴⡏
+⠀⠀ ⢸⡙⠻⣿⣶⣦⣭⣉⠁⣿
+⠀⠀⠀⣷ ⠈{name}⠉⡟
+⠀⠀⢀ ⣘⣦⣀ ⣀⡴⠊
+⠀⠈⠙⠛⢻⣿⣿⣿⣿⠻⣧⡀
+⠀⠀⠀⠈⠫⣿⠉⠻⣇⠘⠓⠂
+⠀⠀⠀⠀⠀⠀⠀⣿
+⢶⣾⣿⣶⣄ ⣿
+⠀⠹⣿⣿⣧ ⢸⣿
+⠀⠀⠈⠙⠻⢿⣿⠿⠛⣄⢸⡇
+⠀⠀⠀⠀⠀⠀⠘⣿⡇
+⠀⠀⠀⠀⠀⣿
+⠀⠀⠀⠀⠀⠀⠀⣿⠇
+⠀⠀⠀⠀⠀⠀⠀⠋"""
+
+ROMANTIC_ROSE = """⣤⢔⣒⠂⣀⣤⣄⣀
+⣴⣿⠋⢠⣟⡼⣷⠼⣆⣼⢇⣿⣄⠱⣄
+⠹⣿⡀⣆⠙⠢⠐⠉⣴⣾⣽⢟⡰⠃
+⠀⠈⢿⣿⣦ ⠤⢴⣿⠿⢋⣴⡏
+⠀⠀ ⢸⡙⠻⣿⣶⣦⣭⣉⠁⣿
+⠀⠀⠀⣷ ⠈{name}⠉⡟
+⠀⠀⢀ ⣘⣦⣀ ⣀⡴⠊
+⠀⠈⠙⠛⠛⢻⣿⣿⠻⣧⡀
+⠀⠀⠀⠈⠫⣿ {line1} ⠻⣇
+⠀⠀⠀⣿ {line2}
+⢶⣾⣿⣶⣄ ⣿
+⠀⠹⣿⣿⣧ ⢸⣿
+⠀⠀⠈⠙⠻⢿⣿⠿⠛⣄⢸⡇
+⠀⠀⠀⠀⠘⣿⡇
+⠀⠀⠀⣿
+⠀⠀⠀⣿⠇
+⠀⠀⠀⠀⠀⠀⠀⠋"""
+
+
+@app.on_message(filters.me & filters.command("rosename", "."))
+async def name_rose(client, message: Message):
+    if len(message.command) < 2:
+        return await message.edit("❌ **Use:** `.rosename KARTIK`")
+    
+    name = " ".join(message.command[1:]).upper()
+    if len(name) > 10:
+        return await message.edit("❌ **Naam 10 letters se chota rakho**")
+    
+    rose = BRAILLE_ROSE_TEMPLATE.format(name=name)
+    await message.edit(f"🌹 **{name} KA BRAILLE ROSE** 🌹\n\n`{rose}`")
+
+
+@app.on_message(filters.me & filters.command("romanticrose", "."))
+async def romantic_rose(client, message: Message):
+    args = message.command[1:]
+    if len(args) < 3:
+        return await message.edit("❌ **Use:** `.romanticrose NAME LINE1 LINE2`\nEx: `.romanticrose PRIYA I LOVE YOU`")
+
+    name = args[0].upper()
+    line1 = " ".join(args[1:2]).upper()
+    line2 = " ".join(args[2:]).upper()
+
+    if len(line1) > 8: line1 = line1[:8]
+    if len(line2) > 12: line2 = line2[:12]
+    if len(name) > 10: name = name[:10]
+
+    rose = ROMANTIC_ROSE.format(name=name, line1=line1, line2=line2)
+    await message.edit(f"❤️ **ROMANTIC ROSE FOR {name}** ❤️\n\n`{rose}`")
+
+
+@app.on_message(filters.me & filters.command("50rose", "."))
+async def fifty_rose(client, message: Message):
+    names = ["KARTIK","ISHIKA","PRIYA","RAHUL","ANJALI","ARJUN","SNEHA","VIKAS","PAYAL","AMAN",
+             "NEHA","ROHIT","POOJA","AJAY","RITU","SUMIT","KIRAN","DEEPAK","SHRUTI","MOHIT",
+             "SIMRAN","SAHIL","TANU","NIKHIL","ANITA","VARUN","RIA","AKASH","MUSKAN","KUNAL",
+             "ANUSHA","RAJ","KHUSHI","SACHIN","DIVYA","YASH","TANVI","ABHISHEK","NANDINI","VIVEK",
+             "SAKSHI","HARSH","MEERA","ADITYA","JYOTI","RITESH","KOMAL","ANKIT","PALAK","LOVE"]
+    
+    await message.edit("⏳ **50 Rose bana raha hu...**")
+    for name in names:
+        rose = BRAILLE_ROSE_TEMPLATE.format(name=name)
+        await client.send_message(message.chat.id, f"🌹 **{name}** 🌹\n\n`{rose}`")
+        await asyncio.sleep(1.5)
+        
 print("🔥 ISHIKA USERBOT V2.5 FULL STARTED ✅ 17 SHAYARI + AI COUPLE 🔥")
 app.run()
