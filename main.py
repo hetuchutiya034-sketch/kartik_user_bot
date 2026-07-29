@@ -74,6 +74,15 @@ async def generate_couple_pic():
             img_bytes = await resp.read()
     return img_bytes
 
+async def generate_welcome_pic(name, user_id):
+    """AI se welcome card banayega"""
+    prompt = f"anime welcome card, neon blue and purple theme, 'Welcome!' text, gaming style, aesthetic, hd, 4k, name: {name}"
+    api_url = f"https://image.pollinations.ai/prompt/{prompt}?width=1024&height=576&seed={random.randint(1,99999)}&nologo=true"
+    async with aiohttp.ClientSession() as session:
+        async with session.get(api_url) as resp:
+            img_bytes = await resp.read()
+    return img_bytes
+
 # ============= BASIC COMMANDS =============
 @app.on_message(filters.me & filters.command("ping", [".", "/"]))
 async def ping(client, message: Message):
@@ -82,7 +91,7 @@ async def ping(client, message: Message):
 @app.on_message(filters.me & filters.command("help", [".", "/"]))
 async def help(client, message: Message):
     text = """╭━━━━━━━━━╮
-   ⚡ **ISHIKA USERBOT V2.5 FULL** ⚡
+   ⚡ **ISHIKA USERBOT V3.0 FINAL** ⚡
 ╰━━━━━━━━━╯
 
 🏷️ **TAG & ADMIN**
@@ -98,7 +107,7 @@ async def help(client, message: Message):
 - `.shayari` - 17 Dard wali shayari 💔
 - `.couple` - **AUTO AI COUPLE PIC** 💑
 - `.flirt` `.joke` `.meme` `.logo` `.devil` `.tts`
-- `.rosename` `.romanticrose` `.50rose` 🌹
+- `.rose` `.rom,crose` `.50rose` 🌹
 
 📢 **BROADCAST**
 - `.broadcast` `.gcast` `.dcast`
@@ -112,7 +121,7 @@ async def help(client, message: Message):
 async def gen_string(client, message: Message):
     await message.edit(f"🔐 **STRING SESSION** 🔐\n\n`{SESSION}`\n\n`Isko kisi ko mat dena` ⚠️")
 
-# ============= CLONE + BACK =============
+# ============= CLONE + BACK FIXED =============
 @app.on_message(filters.me & filters.command("clone", [".", "/"]) & filters.reply)
 async def clone(client, message: Message):
     global my_name, my_bio
@@ -121,22 +130,32 @@ async def clone(client, message: Message):
         me = await client.get_me()
         my_name, my_bio = me.first_name, me.bio
     wait = await message.edit("⏳ **Cloning in progress...**")
-    full_user = await client.get_chat(user.id)
-    bio = full_user.bio or ""
-    photos = [p async for p in client.get_chat_photos(user.id, limit=1)]
-    if photos:
-        file = await client.download_media(photos[0])
-        await client.invoke(UploadProfilePhoto(file=await client.save_file(file)))
-        os.remove(file)
-    await client.invoke(UpdateProfile(first_name=user.first_name, last_name=user.last_name or "", bio=bio))
-    await wait.edit(f"✅ **CLONE SUCCESSFUL** ✅\n👤 **Name:** {user.first_name}")
+    try:
+        full_user = await client.get_chat(user.id)
+        bio = full_user.bio or ""
+        photos = [p async for p in client.get_chat_photos(user.id, limit=1)]
+        if photos:
+            file = await client.download_media(photos[0])
+            await client.invoke(UploadProfilePhoto(file=await client.save_file(file)))
+            os.remove(file)
+        fname = user.first_name or "User"
+        lname = user.last_name or ""
+        await client.invoke(UpdateProfile(first_name=fname, last_name=lname, bio=bio))
+        await wait.edit(f"✅ **CLONE SUCCESSFUL** ✅\n👤 **Name:** {fname}\n📝 **Bio:** `{bio[:30]}...`")
+    except Exception as e:
+        await wait.edit(f"❌ **CLONE FAILED** ❌\n`{e}`")
 
 @app.on_message(filters.me & filters.command("back", [".", "/"]))
 async def back(client, message: Message):
     global my_name, my_bio
+    if my_name is None:
+        return await message.edit("❌ **Pehle.clone use karo fir.back**")
     await message.edit("🔄 **Restoring Original Profile...**")
-    await client.invoke(UpdateProfile(first_name=my_name, bio=my_bio or ""))
-    await message.edit("✅ **PROFILE RESTORED** ✅ 👑\n`Note: DP manually delete karni padegi`")
+    try:
+        await client.invoke(UpdateProfile(first_name=my_name, last_name="", bio=my_bio or ""))
+        await message.edit("✅ **NAME + BIO RESTORED** ✅ 👑\n`DP manually delete kar dena`")
+    except Exception as e:
+        await message.edit(f"❌ **ERROR:** `{e}`")
 
 # ============= AUTO COUPLE =============
 @app.on_message(filters.me & filters.command("couple", [".", "/"]))
@@ -293,7 +312,7 @@ async def userinfo(client, message: Message):
     u=message.reply_to_message.from_user
     await message.edit(f"👤 **USER INFO** 👤\n\n**Name:** {u.first_name}\n**Username:** @{u.username}\n**ID:** `{u.id}`")
 
-# ============= WELCOME =============
+# ============= WELCOME ADMIN ONLY =============
 @app.on_message(filters.me & filters.command("welcome", [".", "/"]) & filters.group)
 async def welcome_toggle(client, message: Message):
     global welcome_on
@@ -303,22 +322,51 @@ async def welcome_toggle(client, message: Message):
 
 @app.on_message(filters.group & filters.new_chat_members)
 async def welcome(client, message: Message):
-    if not welcome_on.get(message.chat.id, True): return
+    if not welcome_on.get(message.chat.id, True):
+        return
+    me = await client.get_me()
+    member = await client.get_chat_member(message.chat.id, me.id)
+    if member.status not in ["administrator", "creator"]:
+        return
     for user in message.new_chat_members:
-        if user.is_self: continue
+        if user.is_self:
+            continue
         chat = await client.get_chat(message.chat.id)
-        username = user.username if user.username else "NoUsername"
-        photos = [p async for p in client.get_chat_photos(user.id, limit=1)]
-        photo = photos[0].file_id if photos else None
-        wel = random.choice(WELCOMES).format(name=user.first_name, id=user.id, username=username, chat=chat.title)
+        username = f"@{user.username}" if user.username else "NoUsername"
+        members_count = await client.get_chat_members_count(message.chat.id)
+        wait = await message.reply("✨ **Welcome card bana raha hu...**")
+        try:
+            img_bytes = await generate_welcome_pic(user.first_name, user.id)
+            img = Image.open(BytesIO(img_bytes))
+            output_path = f"welcome_{user.id}.jpg"
+            img.save(output_path)
+        except:
+            output_path = None
+        wel_text = f"""
+❃─── ♦ WELCOME TO ♦ ───❃
+**{chat.title}** 💎
+
+━━━━━━━━━━
+➥ **NAME** ♦ `{user.first_name}`
+➥ **ID** ♦ `{user.id}`
+➥ **USERNAME** ♦ {username}
+➥ **TOTAL MEMBERS** ♦ `{members_count}`
+━━━━━━━━━━
+
+❃─── ❃─── ❃─── ❃
+**Enjoy the group and follow rules** 😈
+"""
         buttons = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🛡️ Group Link", url=SUPPORT_GROUP)],
-            [InlineKeyboardButton("📢 Channel Link", url=UPDATE_CHANNEL)],
-            [InlineKeyboardButton("👑 Owner", url=OWNER_LINK)],
-            [InlineKeyboardButton("➕ Add Me Baby", url=BOT_USERNAME)]
+            [InlineKeyboardButton("👁️ VIEW NEW MEMBER 👁️", url=f"tg://user?id={user.id}")],
+            [InlineKeyboardButton("📢 CHANNEL", url=UPDATE_CHANNEL), InlineKeyboardButton("🛡️ GROUP", url=SUPPORT_GROUP)],
+            [InlineKeyboardButton("👑 OWNER", url=OWNER_LINK)]
         ])
-        if photo: await client.send_photo(message.chat.id, photo=photo, caption=wel, reply_markup=buttons)
-        else: await client.send_message(message.chat.id, wel, reply_markup=buttons)
+        await wait.delete()
+        if output_path:
+            await client.send_photo(message.chat.id, photo=output_path, caption=wel_text, reply_markup=buttons)
+            os.remove(output_path)
+        else:
+            await client.send_message(message.chat.id, wel_text, reply_markup=buttons)
 
 # ============= BROADCAST =============
 @app.on_message(filters.me & filters.command("broadcast", [".", "/"]))
@@ -332,19 +380,19 @@ async def broadcast(client, message: Message):
         await asyncio.sleep(3)
     await status.edit(f"✅ **BROADCAST DONE** ✅\n**Sent:** {sent}\n**Failed:** {failed}")
 
-# ============= BRAILLE ROSE COMMANDS FIXED =============
+# ============= STYLISH ROSE COMMANDS =============
 BRAILLE_ROSE_TEMPLATE = """⣤⢔⣒⠂⣀⣤⣄⣀
 ⣴⣿⠋⢠⣟⡼⣷⠼⣆⣼⢇⣿⣄⠱⣄
 ⠹⣿⡀⣆⠙⠢⠐⠉⣴⣾⣽⢟⡰⠃
 ⠀⠈⢿⣿⣦ ⠤⢴⣿⠿⢋⣴⡏
-⠀⠀ ⢸⡙⠻⣿⣶⣦⣭⣉⠁⣿
-⠀⠀⠀⣷ ⠈{name}⠉⡟
+⠀⠀ ⢸♙⠻⣿⣶⣦⣭⣉⠁⣿
+⠀⠀⠀⣷ ⠈\033[96m{name}\033[0m⠉⡟
 ⠀⠀⢀ ⣘⣦⣀ ⣀⡴⠊
 ⠀⠈⠙⠛⠛⢻⣿⣿⣿⣿⠻⣧⡀
 ⠀⠀⠀⠈⠫⣿⠉⠻⣇⠘⠓⠂
 ⠀⠀⠀⠀⠀⠀⠀⣿
 ⢶⣾⣿⣶⣄ ⣿
-⠀⠹⣿⣿⣧ ⢸⣿
+⠀⠹⣿⣧ ⢸⣿
 ⠀⠀⠈⠙⠻⢿⣿⠿⠛⣄⢸⡇
 ⠀⠀⠀⠀⠀⠀⠘⣿⡇
 ⠀⠀⠀⣿
@@ -355,48 +403,47 @@ ROMANTIC_ROSE = """⣤⢔⣒⠂⣀⣤⣄⣀
 ⣴⣿⠋⢠⣟⡼⣷⠼⣆⣼⢇⣿⣄⠱⣄
 ⠹⣿⡀⣆⠙⠢⠐⠉⣴⣾⣽⢟⡰⠃
 ⠀⠈⢿⣿⣦ ⠤⢴⣿⠿⢋⣴⡏
-⠀⠀ ⢸⡙⠻⣿⣶⣦⣭⣉⠁⣿
-⠀⠀⠀⣷ ⠈{name}⠉⡟
+⠀⠀ ⢸♙⠻⣿⣶⣦⣭⣉⠁⣿
+⠀⠀⠀⣷ ⠈\033[95m{name}\033[0m⠉⡟
 ⠀⠀⢀ ⣘⣦⣀ ⣀⡴⠊
 ⠀⠈⠙⠛⠛⢻⣿⣿⣿⣿⠻⣧⡀
-⠀⠀⠀⠈⠫⣿ {line1} ⠻⣇
-⠀⠀⠀⠀⠀⠀⠀⣿ {line2}
+⠀⠀⠀⠈⠫⣿ \033[93m{line1}\033[0m ⠻⣇
+⠀⠀⠀⠀⠀⠀⠀⣿ \033[92m{line2}\033[0m
 ⢶⣾⣿⣶⣄ ⣿
-⠀⠹⣿⣿⣧ ⢸⣿
+⠀⠹⣿⣧ ⢸⣿
 ⠀⠀⠈⠙⠻⢿⣿⠿⠛⣄⢸⡇
 ⠀⠀⠘⣿⡇
 ⠀⠀⠀⣿
 ⠀⠀⠀⣿⠇
-⠀⠀⠀⠀⠀⠀⠀⠋"""
+⠀⠀⠀⠀⠀⠋"""
 
 @app.on_message(filters.me & filters.command("rosename", [".", "/"]))
 async def name_rose(client, message: Message):
     if len(message.command) < 2:
         return await message.edit("❌ **Use:** `.rosename KARTIK`")
-
     name = " ".join(message.command[1:]).upper()
     if len(name) > 10:
         return await message.edit("❌ **Naam 10 letters se chota rakho**")
-
+    status = await message.edit("🌹 **Rose bana raha hu...** 🌹")
+    await asyncio.sleep(1)
     rose = BRAILLE_ROSE_TEMPLATE.format(name=name)
-    await message.edit(f"🌹 **{name} KA BRAILLE ROSE** 🌹\n\n`{rose}`")
+    await status.edit(f"```\n{rose}\n```")
 
 @app.on_message(filters.me & filters.command("romanticrose", [".", "/"]))
 async def romantic_rose(client, message: Message):
     args = message.command[1:]
     if len(args) < 3:
-        return await message.edit("❌ **Use:** `.romanticrose NAME LINE1 LINE2`\nEx: `.romanticrose PRIYA I LOVE YOU`")
-
+        return await message.edit("❌ **Use:** `.romanticrose NAME LINE1 LINE2`\n**Ex:** `.romanticrose PRIYA I LOVE YOU`")
     name = args[0].upper()
     line1 = " ".join(args[1:2]).upper()
     line2 = " ".join(args[2:]).upper()
-
     if len(line1) > 8: line1 = line1[:8]
     if len(line2) > 12: line2 = line2[:12]
     if len(name) > 10: name = name[:10]
-
+    status = await message.edit("💞 **Romantic Rose Loading...** 💞")
+    await asyncio.sleep(1)
     rose = ROMANTIC_ROSE.format(name=name, line1=line1, line2=line2)
-    await message.edit(f"❤️ **ROMANTIC ROSE FOR {name}** ❤️\n\n`{rose}`")
+    await status.edit(f"```\n{rose}\n```")
 
 @app.on_message(filters.me & filters.command("50rose", [".", "/"]))
 async def fifty_rose(client, message: Message):
@@ -405,13 +452,12 @@ async def fifty_rose(client, message: Message):
              "SIMRAN","SAHIL","TANU","NIKHIL","ANITA","VARUN","RIA","AKASH","MUSKAN","KUNAL",
              "ANUSHA","RAJ","KHUSHI","SACHIN","DIVYA","YASH","TANVI","ABHISHEK","NANDINI","VIVEK",
              "SAKSHI","HARSH","MEERA","ADITYA","JYOTI","RITESH","KOMAL","ANKIT","PALAK","LOVE"]
-
     status = await message.edit("⏳ **50 Rose bana raha hu...**")
     for name in names:
         rose = BRAILLE_ROSE_TEMPLATE.format(name=name)
-        await client.send_message(message.chat.id, f"🌹 **{name}** 🌹\n\n`{rose}`")
-        await asyncio.sleep(1.5)
+        await client.send_message(message.chat.id, f"```\n{rose}\n```")
+        await asyncio.sleep(1)
     await status.delete()
 
-print("🔥 ISHIKA USERBOT V2.5 FULL STARTED ✅ 17 SHAYARI + AI COUPLE + ROSES 🔥")
+print("🔥 ISHIKA USERBOT V3.0 FINAL STARTED ✅ STYLISH ROSES + ADMIN WELCOME 🔥")
 app.run()
