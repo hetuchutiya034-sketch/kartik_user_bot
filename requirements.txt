@@ -1,8 +1,5 @@
-pyrogram==2.0.106
+pyrogram
 tgcrypto
-python-dotenv
-Pillow
-gTTS
-aiohttp
-pydub
 flask
+python-dotenv
+pillow
