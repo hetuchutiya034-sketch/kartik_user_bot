@@ -18,7 +18,7 @@ def home(): return "LIVE DP USERBOT IS RUNNING!"
 def run_web(): web_app.run(host='0.0.0.0', port=int(os.getenv("PORT", 10000)))
 Thread(target=run_web, daemon=True).start()
 
-# --- CONFIG - SIRF 3 ---
+# --- CONFIG ---
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
 SESSION_STRING = os.getenv("SESSION_STRING")
@@ -51,7 +51,6 @@ async def create_3d_dp(color):
         font_k = ImageFont.load_default()
         font_time = ImageFont.load_default()
 
-    # BADA 3D K
     letter = "K"
     bbox_k = draw.textbbox((0,0), letter, font=font_k)
     w_k, h_k = bbox_k[2] - bbox_k[0], bbox_k[3] - bbox_k[1]
@@ -60,7 +59,6 @@ async def create_3d_dp(color):
     for i in range(8, 0, -1): draw.text((x_k+i, y_k+i), letter, font=font_k, fill="#B8860B")
     draw.text((x_k, y_k), letter, font=font_k, fill="#FFD700")
 
-    # BADA TIME
     ist_time = datetime.datetime.now() + datetime.timedelta(hours=5, minutes=30)
     time_str = ist_time.strftime('%I:%M %p')
     bbox_t = draw.textbbox((0,0), time_str, font=font_time)
@@ -77,7 +75,7 @@ async def create_3d_dp(color):
 async def run_automation():
     global AUTO_ON
     i = 0
-    await asyncio.sleep(10)
+    await asyncio.sleep(15) # 15 sec wait for login
     while True:
         if AUTO_ON:
             try:
@@ -93,7 +91,7 @@ async def run_automation():
             except Exception as e: print(f"❌ Error: {e}")
         await asyncio.sleep(60)
 
-# ============= COMMANDS - SIRF "me" KE LIYE =============
+# ============= COMMANDS =============
 @app.on_message(filters.command("start") & filters.me)
 async def start(_, message: Message):
     status = "✅ ON" if AUTO_ON else "❌ OFF"
@@ -125,11 +123,14 @@ async def force_update(_, message: Message):
     os.remove(dp_path)
     await msg.edit_text(f"✅ **Force Updated**\nTime: `{time_str}`")
 
-# ============= START =============
+# ============= START - YAHI FIX HAI =============
 async def main():
     await app.start()
     me = await app.get_me()
     print(f"🔥 LOGIN SUCCESS: {me.first_name} | @{me.username}")
-    await asyncio.gather(run_automation(), app.run())
+
+    # Dono task alag alag chalu karo
+    asyncio.create_task(run_automation())
+    await app.idle() # app.run() ki jagah idle
 
 asyncio.run(main())
