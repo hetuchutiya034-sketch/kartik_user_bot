@@ -39,34 +39,39 @@ def recall(q):
     data = c.fetchall()
     return random.choice(data)[0] if data else None
 
-# ============= SHAYARI LISTS =============
+# ============= SHAYARI LISTS FULL =============
 DARD_SHAYARI = [
     "Dil tod ke wo muskura rahe hai,\nHum unhe yaad karke ro rahe hai।",
     "Zakhm itne mile zindagi mein,\nAb dard bhi mehmaan lagta hai।",
-    "Mohabbat bhi kitni ajeeb hoti hai,\nJo apna hota hai wahi door hota hai।"
+    "Mohabbat bhi kitni ajeeb hoti hai,\nJo apna hota hai wahi door hota hai।",
+    "Teri kami mein ye dil rota hai,\nHar pal bas tujhe hi dhundhta hai।"
 ]
 
 LOVE_SHAYARI = [
     "Tumhari muskaan hi meri jaan hai,\nTumse hi meri pehchaan hai।",
     "Ishq tumse kuch is tarah hai,\nJaise saans se zindagi।",
-    "Teri aankhon mein doob jana hai,\nBas tujh mein hi kho jana hai।"
+    "Teri aankhon mein doob jana hai,\nBas tujh mein hi kho jana hai।",
+    "Tum mil gaye to laga,\nMujhe meri duniya mil gayi।"
 ]
 
 ATTITUDE_SHAYARI = [
     "Hum se jalne wale bhi kamaal ke hote hai,\nMehfil apni aur charche hamare।",
     "Naam hi kaafi hai,\nPehchaan banane ke liye।",
-    "Hum wahi hai jo dikhte hai,\nAur jo nahi dikhte wo khatarnaak hai।"
+    "Hum wahi hai jo dikhte hai,\nAur jo nahi dikhte wo khatarnaak hai।",
+    "Taqat se nahi, aukaat se baat hoti hai,\nAur hamari aukaat tum soch bhi nahi sakte।"
 ]
 
 SAD_SHAYARI = [
     "Aansu bhi kitne ajeeb hote hai,\nKhushi mein bhi aa jate hai।",
     "Tanha rehna seekh liya hai,\nAb kisi ki zarurat nahi।",
-    "Dil ke armaan aansuon mein beh gaye,\nHum wafa karte karte reh gaye।"
+    "Dil ke armaan aansuon mein beh gaye,\nHum wafa karte karte reh gaye।",
+    "Kisi ko apna bana ke dekho,\nFir use khone ka dard samjhoge।"
 ]
 
 # ============= HUMAN AI =============
 async def get_owner_mention():
     try:
+        if OWNER_ID == 0: return "KING"
         user = await app.get_users(OWNER_ID)
         return f"@{user.username}" if user.username else f"<a href='tg://user?id={OWNER_ID}'>KING</a>"
     except:
@@ -95,33 +100,7 @@ async def ping(_, m: Message):
 
 @app.on_message(filters.me & filters.command("help", "."))
 async def help_menu(_, m: Message):
-    menu = """
-👑 <b>KARTIK KING USERBOT MENU</b> 👑
-
-<b>1. BASIC</b>
-<code>.ping</code> - Bot check
-<code>.autoai</code> - Group me auto reply on/off
-<code>.dmai</code> - Sirf us DM me auto reply on/off
-
-<b>2. AI MEMORY</b>
-<code>.teach sawal | jawab</code> - Bot ko sikhana
-Ex: <code>.teach hello | Hello KING 👑</code>
-
-<b>3. UTILITY</b>
-<code>.afk reason</code> - AFK lagana
-<code>.tagall msg</code> - Sabko tag karna
-
-<b>4. SHAYARI</b> 💔
-<code>.dard</code> - Dard shayari
-<code>.love</code> - Love shayari
-<code>.attitude</code> - Attitude shayari
-<code>.sad</code> - Sad shayari
-
-<b>EXTRA</b>
-Sticker bhejo → Bot bhi wahi sticker bhejega
-
-Made by KING KARTIK 👑
-"""
+    menu = """👑 <b>KARTIK KING USERBOT MENU</b> 👑\n\n<b>1. BASIC</b>\n<code>.ping</code> - Bot check\n<code>.autoai</code> - Group me auto reply on/off\n<code>.dmai</code> - Sirf us DM me auto reply on/off\n\n<b>2. AI MEMORY</b>\n<code>.teach sawal | jawab</code> - Bot ko sikhana\n<b>3. UTILITY</b>\n<code>.afk reason</code> - AFK lagana\n<code>.tagall msg</code> - Sabko tag karna\n<b>4. SHAYARI</b> 💔\n<code>.dard</code> - Dard shayari\n<code>.love</code> - Love shayari\n<code>.attitude</code> - Attitude shayari\n<code>.sad</code> - Sad shayari\n<b>EXTRA</b>\nSticker bhejo → Bot bhi wahi sticker bhejega\n\nMade by KING KARTIK 👑"""
     await m.edit(menu)
 
 @app.on_message(filters.me & filters.command("autoai", "."))
@@ -173,32 +152,32 @@ async def afk(_, m: Message):
 async def tagall(_, m: Message):
     try: await m.delete()
     except: pass
-    txt = m.text.split(".tagall ", 1)[1] if len(m.text.split()) > 1 else "Sab aa jao 👑"
-    members = []
-    async for member in app.get_chat_members(m.chat.id):
-        if not member.user.is_bot:
-            members.append(f"<a href='tg://user?id={member.user.id}'>ㅤ</a>")
-    mention = ""; count = 0
-    for i in members:
-        mention += i; count += 1
-        if count == 5:
+    try:
+        txt = m.text.split(".tagall ", 1)[1] if len(m.text.split()) > 1 else "Sab aa jao 👑"
+        members = []
+        async for member in app.get_chat_members(m.chat.id):
+            if not member.user.is_bot:
+                members.append(f"<a href='tg://user?id={member.user.id}'>ㅤ</a>")
+        mention = ""; count = 0
+        for i in members:
+            mention += i; count += 1
+            if count == 5:
+                await app.send_message(m.chat.id, f"{txt}\n{mention}")
+                mention = ""; count = 0; await asyncio.sleep(3)
+        if mention:
             await app.send_message(m.chat.id, f"{txt}\n{mention}")
-            mention = ""; count = 0; await asyncio.sleep(3)
-    if mention:
-        await app.send_message(m.chat.id, f"{txt}\n{mention}")
+    except Exception as e:
+        await m.reply(f"Tagall Error: {e}\nBot ko group me admin banao")
 
 @app.on_message(filters.me & filters.command("dard", "."))
 async def dard(_, m: Message):
     await m.edit(f"💔 DARD SHAYARI 💔\n\n{random.choice(DARD_SHAYARI)}")
-
 @app.on_message(filters.me & filters.command("love", "."))
 async def love(_, m: Message):
     await m.edit(f"❤️ LOVE SHAYARI ❤️\n\n{random.choice(LOVE_SHAYARI)}")
-
 @app.on_message(filters.me & filters.command("attitude", "."))
 async def attitude(_, m: Message):
     await m.edit(f"😈 ATTITUDE SHAYARI 😈\n\n{random.choice(ATTITUDE_SHAYARI)}")
-
 @app.on_message(filters.me & filters.command("sad", "."))
 async def sad(_, m: Message):
     await m.edit(f"😢 SAD SHAYARI 😢\n\n{random.choice(SAD_SHAYARI)}")
@@ -207,40 +186,46 @@ async def sad(_, m: Message):
 @app.on_message(filters.group & ~filters.me)
 async def group_ai(_, m: Message):
     global afk_status
-    owner_mention = await get_owner_mention()
-    if afk_status and m.reply_to_message and m.reply_to_message.from_user.id == OWNER_ID:
-        await m.reply(f"💤 KING AFK hai: {afk_reason}")
-        return
-    if m.chat.id not in ai_groups:
-        return
-    if m.sticker:
+    try:
+        owner_mention = await get_owner_mention()
+        if afk_status and m.reply_to_message and m.reply_to_message.from_user.id == OWNER_ID:
+            await m.reply(f"💤 KING AFK hai: {afk_reason}")
+            return
+        if m.chat.id not in ai_groups:
+            return
+        if m.sticker:
+            await asyncio.sleep(1)
+            await m.reply_sticker(m.sticker.file_id)
+            return
+        if not m.text:
+            return
+        await asyncio.sleep(random.uniform(1.5, 3.5))
+        await app.send_chat_action(m.chat.id, ChatAction.TYPING)
         await asyncio.sleep(1)
-        await m.reply_sticker(m.sticker.file_id)
-        return
-    if not m.text:
-        return
-    await asyncio.sleep(random.uniform(1.5, 3.5))
-    await app.send_chat_action(m.chat.id, ChatAction.TYPING)
-    await asyncio.sleep(1)
-    reply = human_reply(m.text, owner_mention)
-    await m.reply_text(reply)
+        reply = human_reply(m.text, owner_mention)
+        await m.reply_text(reply)
+    except Exception as e:
+        print(f"Group Error: {e}")
 
 @app.on_message(filters.private & ~filters.me)
 async def pm_ai(_, m: Message):
-    if m.from_user.id not in ai_dms:
-        return
-    owner_mention = await get_owner_mention()
-    if m.sticker:
+    try:
+        if m.from_user.id not in ai_dms:
+            return
+        owner_mention = await get_owner_mention()
+        if m.sticker:
+            await asyncio.sleep(1)
+            await m.reply_sticker(m.sticker.file_id)
+            return
+        if not m.text:
+            return
+        await asyncio.sleep(random.uniform(1, 2.5))
+        await app.send_chat_action(m.chat.id, ChatAction.TYPING)
         await asyncio.sleep(1)
-        await m.reply_sticker(m.sticker.file_id)
-        return
-    if not m.text:
-        return
-    await asyncio.sleep(random.uniform(1, 2.5))
-    await app.send_chat_action(m.chat.id, ChatAction.TYPING)
-    await asyncio.sleep(1)
-    reply = human_reply(m.text, owner_mention)
-    await m.reply_text(reply)
+        reply = human_reply(m.text, owner_mention)
+        await m.reply_text(reply)
+    except Exception as e:
+        print(f"PM Error: {e}")
 
 # ============= START =============
 if __name__ == "__main__":
