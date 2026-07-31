@@ -1,52 +1,52 @@
 import os
+import sys
 import asyncio
 import random
+import json
+import aiohttp
 from dotenv import load_dotenv
 load_dotenv()
 
 from pyrogram import Client, filters
 from pyrogram.types import Message
-import google.generativeai as genai
+from groq import Groq
 
 # ================= CONFIG =================
 API_ID = int(os.getenv("API_ID", 0))
 API_HASH = os.getenv("API_HASH")
 SESSION = os.getenv("SESSION")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+OWNER_ID = int(os.getenv("OWNER_ID", 0)) # apna telegram id daal dena Railway me
 
-# DEBUG
 print("="*30)
-print("DEBUG: API_ID =", API_ID)
-print("DEBUG: API_HASH mil rahi hai =", "HAAN" if API_HASH else "NAHI")
-print("DEBUG: SESSION mil rahi hai =", "HAAN" if SESSION else "NAHI")
-print("DEBUG: GEMINI_KEY mil rahi hai =", "HAAN" if GEMINI_API_KEY else "NAHI")
+print("DEBUG: GROQ_KEY mil rahi =", "HAAN" if GROQ_API_KEY else "NAHI")
 print("="*30)
 
 if not API_ID or not API_HASH or not SESSION:
-    print("❌ ERROR: API_ID, API_HASH, ya SESSION missing hai")
-    exit()
+    exit("❌ ERROR: API_ID, API_HASH, ya SESSION missing hai")
 
-# Gemini Config
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-1.5-flash')
-else:
-    model = None
-    print("⚠️ WARNING: GEMINI_API_KEY nahi hai. AI reply kaam nahi karega")
+# Groq Client
+client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 
-app = Client(
-    name="ishikauserbot",
-    api_id=API_ID,
-    api_hash=API_HASH,
-    session_string=SESSION
-)
+app = Client(name="ishikauserbot", api_id=API_ID, api_hash=API_HASH, session_string=SESSION)
 
 # ================= GLOBAL =================
 ai_groups = {}
 ai_mode = "normal"
-user_memory = {}
+afk_status = False
+afk_reason = ""
 
-# ================= AI MODES =================
+# ================= DATA LOADER =================
+def load_data(filename):
+    try:
+        with open(filename, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except:
+        return {"all": ["Data nahi mili"]}
+    
+SHAYARI_DATA = load_data('shayari.json')
+ROAST_DATA = load_data('roast.json')
+
 MODES = {
     "normal": "You are a helpful Hinglish assistant. Reply in 2 lines max. Use emoji.",
     "savage": "You are savage roasting Hinglish AI. Reply short and funny.",
@@ -54,36 +54,39 @@ MODES = {
     "funny": "You are funny meme-style AI. Reply with jokes and emojis."
 }
 
-# ================= SHAYARI DATABASE =================
-LOVE = ["""तेरी आँखों में जो बात है, वो किसी और में कहाँ... तेरे बिना ये दिल, अब लगता नहीं यहाँ... ❤️"""]*15
-SAD = ["""दिल टूटा है मगर आवाज़ नहीं, कोई समझे ऐसा अंदाज़ नहीं... 💔"""]*15
-ATTITUDE = ["""हम वो नहीं जो डर जाएं, हम वो हैं जो टकराएं... 😈"""]*10
-GF = ["""तू मेरी जान है, तू ही मेरी पहचान है... ❤️"""]*10
-ALL = LOVE + SAD + ATTITUDE + GF
+# ================= AI FUNCTION =================
+async def ai_reply(text):
+    if not client: return "GROQ_API_KEY nahi lagi hai 😅"
+    system_prompt = MODES[ai_mode]
+    full_prompt = f"{system_prompt}\n\nUser: {text}\nBot:"
+    try:
+        res = client.chat.completions.create(
+            messages=[{"role": "user", "content": full_prompt}],
+            model="llama-3.1-8b-instant",
+            max_tokens=300
+        )
+        return res.choices[0].message.content[:4000]
+    except Exception as e:
+        return f"AI error: {str(e)[:100]} 😅"
 
 # ================= COMMANDS =================
-
 @app.on_message(filters.me & filters.command("help", [".","/"]))
 async def help_cmd(_, m):
     help_text = """**🤖 ISHIKA AI USERBOT - HELP**
 
 **AI Commands**
-`.autoai on/off` - Group me AI auto reply ON/OFF
-`.aimode normal/savage/gf/funny` - AI ka mood change
-`.resetai` - AI ki memory clear
+`.autoai on/off` - Group AI ON/OFF, sirf mention/reply pe
+`.aimode normal/savage/gf/funny` - AI Mood
+`.ask <question>` - AI se pucho
 
-**Shayari Commands**
-`.shayari` - Random shayari
-`.shayarilove` - Love shayari
-`.shayarisad` - Sad shayari
-`.shayariattitude` - Attitude shayari
-`.shayarigf` - GF wali shayari
+**Fun + Utility**
+`.ping.bio.info.coin.roast.afk.restart`
 
-**Utility**
-`.ping` - Bot check
-`.help` - Ye menu
+**Content**
+`.shayari <category>` - shayari love/sad/attitude
+`.anysnap` - Random anime pic
 
-**AI Use:** Reply karke `bot` likho ya PM karo 🔥
+**File:** `shayari.json` aur `roast.json` me add karte jao
 """
     await m.edit(help_text)
 
@@ -96,7 +99,7 @@ async def autoai(_, m):
     if len(m.command)<2: return await m.edit("Use: `.autoai on` ya `.autoai off`")
     ai_groups[cid] = m.command[1]=="on"
     status = "ON ✅" if ai_groups[cid] else "OFF ❌"
-    await m.edit(f"🤖 **AI AUTO REPLY {status}**")
+    await m.edit(f"🤖 **AI AUTO REPLY {status}**\nSirf mention/reply pe kaam karega")
 
 @app.on_message(filters.me & filters.command("aimode", [".","/"]))
 async def mode(_, m):
@@ -104,55 +107,105 @@ async def mode(_, m):
     if len(m.command)<2: return await m.edit("Use: `.aimode normal/savage/gf/funny`")
     if m.command[1] in MODES:
         ai_mode = m.command[1]
-        await m.edit(f"Mode changed to: **{ai_mode}** 🔥")
+        await m.edit(f"Mode changed: **{ai_mode}** 🔥")
     else:
-        await m.edit("Galat mode. Use: normal/savage/gf/funny")
+        await m.edit("Galat mode")
 
-@app.on_message(filters.me & filters.command("resetai", [".","/"]))
-async def reset(_, m):
-    user_memory.clear()
-    await m.edit("Memory cleared ✅")
+@app.on_message(filters.me & filters.command("ask", [".","/"]))
+async def ask(_, m):
+    if len(m.command) < 2: return await m.edit("Use: `.ask ye code kya karta hai`")
+    q = " ".join(m.command[1:])
+    await m.edit(await ai_reply(q))
 
-# ================= AI GEMINI =================
-async def ai_reply(uid, text):
-    if not model: return "AI Key nahi lagi hai 😅"
+@app.on_message(filters.me & filters.command("roast", [".","/"]))
+async def roast(_, m):
+    if not m.reply_to_message:
+        return await m.edit("Kisi ke msg ko reply karke `.roast` karo")
+    category = m.command[1] if len(m.command) > 1 else "all"
+    data = ROAST_DATA.get(category, ROAST_DATA.get("all"))
+    await m.edit(f"**{m.reply_to_message.from_user.first_name}**\n{random.choice(data)}")
 
-    system_prompt = MODES[ai_mode]
-    full_prompt = f"{system_prompt}\n\nUser: {text}\nBot:"
+@app.on_message(filters.me & filters.command("coin", [".","/"]))
+async def coin(_, m):
+    await m.edit(f"🪙 Result: **{random.choice(['HEADS','TAILS'])}**")
 
+@app.on_message(filters.me & filters.command("bio", [".","/"]))
+async def bio(_, m):
+    user = m.reply_to_message.from_user if m.reply_to_message else m.from_user
+    await m.edit(f"**Name:** {user.first_name}\n**Username:** @{user.username}\n**ID:** `{user.id}`")
+
+@app.on_message(filters.me & filters.command("info", [".","/"]))
+async def info(_, m):
+    chat = await app.get_chat(m.chat.id)
+    await m.edit(f"**Group:** {chat.title}\n**Members:** {chat.members_count}\n**ID:** `{chat.id}`")
+
+@app.on_message(filters.me & filters.command("afk", [".","/"]))
+async def afk(_, m):
+    global afk_status, afk_reason
+    afk_status = True
+    afk_reason = " ".join(m.command[1:]) if len(m.command) > 1 else "AFK"
+    await m.edit(f"💤 **AFK ON**\nReason: {afk_reason}")
+
+@app.on_message(filters.me & filters.command("restart", [".","/"]))
+async def restart(_, m):
+    await m.edit("♻️ Restarting...")
+    os.execl(sys.executable, sys.executable, *sys.argv)
+
+# ============ ANYSNAP COMMAND ============
+ANIME_APIS = [
+    "https://api.waifu.pics/sfw/waifu",
+    "https://api.waifu.pics/sfw/neko", 
+    "https://api.waifu.pics/sfw/shinobu",
+    "https://api.waifu.pics/sfw/megumin",
+    "https://api.waifu.pics/sfw/cuddle"
+]
+
+@app.on_message(filters.me & filters.command("anysnap", [".","/"]))
+async def anysnap(_, m):
+    msg = await m.edit("🎌 Loading random anime pic...")
     try:
-        res = model.generate_content(full_prompt)
-        reply = res.text
-        return reply[:4000] # telegram limit
+        async with aiohttp.ClientSession() as session:
+            url = random.choice(ANIME_APIS)
+            async with session.get(url) as resp:
+                data = await resp.json()
+                img_url = data.get("url")
+        await msg.delete()
+        await app.send_photo(m.chat.id, img_url, caption="🎌 **AnySnap**")
     except Exception as e:
-        return f"AI error: {str(e)[:100]} 😅"
+        await msg.edit(f"Error: {e}")
 
+# ============ SHAYARI COMMAND ============
+@app.on_message(filters.me & filters.command("shayari", [".","/"]))
+async def shayari(_, m):
+    category = m.command[1] if len(m.command) > 1 else "all"
+    data = SHAYARI_DATA.get(category, SHAYARI_DATA.get("all"))
+    await m.edit(random.choice(data))
+
+# ================= AI AUTO REPLY =================
 @app.on_message(filters.group & ~filters.me)
 async def group_ai(_, m: Message):
+    global afk_status
+    me = await app.get_me()
+    
+    if afk_status and m.reply_to_message and m.reply_to_message.from_user.id == OWNER_ID:
+        await m.reply(f"💤 Me AFK hu: {afk_reason}")
+        afk_status = False
+        return
+
     if not ai_groups.get(m.chat.id): return
     if not m.text: return
-    if m.reply_to_message and m.reply_to_message.from_user.is_self or "bot" in m.text.lower():
-        reply = await ai_reply(m.from_user.id, m.text)
-        await m.reply_text(reply)
+
+    is_reply_to_me = m.reply_to_message and m.reply_to_message.from_user.id == OWNER_ID
+    is_tag = f"@{me.username.lower()}" in m.text.lower()
+
+    if is_reply_to_me or is_tag:
+        await m.reply_text(await ai_reply(m.text))
 
 @app.on_message(filters.private & ~filters.me)
 async def private_ai(_, m: Message):
     if m.text:
-        reply = await ai_reply(m.from_user.id, m.text)
-        await m.reply_text(reply)
-
-# ================= SHAYARI COMMANDS =================
-@app.on_message(filters.me & filters.command("shayari", [".","/"]))
-async def shayari(_, m): await m.edit(random.choice(ALL))
-@app.on_message(filters.me & filters.command("shayarilove", [".","/"]))
-async def love(_, m): await m.edit(random.choice(LOVE))
-@app.on_message(filters.me & filters.command("shayarisad", [".","/"]))
-async def sad(_, m): await m.edit(random.choice(SAD))
-@app.on_message(filters.me & filters.command("shayariattitude", [".","/"]))
-async def att(_, m): await m.edit(random.choice(ATTITUDE))
-@app.on_message(filters.me & filters.command("shayarigf", [".","/"]))
-async def gf(_, m): await m.edit(random.choice(GF))
+        await m.reply_text(await ai_reply(m.text))
 
 # ================= START =================
-print("🔥 FULL AI USERBOT STARTED WITH GEMINI 🔥")
+print("🔥 ISHIKA AI USERBOT GROQ KE SAATH STARTED 🔥")
 app.run()
