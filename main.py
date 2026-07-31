@@ -11,7 +11,6 @@ load_dotenv()
 from pyrogram import Client, filters
 from pyrogram.types import Message
 from groq import Groq
-from keep_alive import keep_alive
 
 # ================= CONFIG =================
 API_ID = int(os.getenv("API_ID", 0))
