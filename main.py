@@ -1,7 +1,7 @@
 import os
 import sys
 import random
-import json
+import asyncio
 import aiohttp
 from dotenv import load_dotenv
 load_dotenv()
@@ -169,7 +169,7 @@ async def restart(_, m):
     await m.edit("♻️ Restarting...")
     os.execl(sys.executable, sys.executable, *sys.argv)
 
-# ============ ANYSNAP COMMAND ============
+# ============ ANYSNAP COMMAND - FIXED ============
 ANIME_APIS = [
     "https://api.waifu.pics/sfw/waifu",
     "https://api.waifu.pics/sfw/neko",
@@ -182,15 +182,19 @@ ANIME_APIS = [
 async def anysnap(_, m):
     msg = await m.edit("🎌 Loading random anime pic...")
     try:
-        async with aiohttp.ClientSession() as session:
+        timeout = aiohttp.ClientTimeout(total=10)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
             url = random.choice(ANIME_APIS)
             async with session.get(url) as resp:
-                data = await resp.json()
-                img_url = data.get("url")
-        await msg.delete()
-        await app.send_photo(m.chat.id, img_url, caption="🎌 **AnySnap**")
+                if resp.status == 200:
+                    data = await resp.json()
+                    img_url = data.get("url")
+                    await msg.delete()
+                    await app.send_photo(m.chat.id, img_url, caption="🎌 **AnySnap**")
+                else:
+                    await msg.edit("API down hai bhai, baad me try kar")
     except Exception as e:
-        await msg.edit(f"Error: {e}")
+        await msg.edit(f"Error: {str(e)[:100]}")
 
 # ============ SHAYARI COMMAND ============
 @app.on_message(filters.me & filters.command("shayari", [".","/"]))
