@@ -46,21 +46,18 @@ DARD_SHAYARI = [
     "Mohabbat bhi kitni ajeeb hoti hai,\nJo apna hota hai wahi door hota hai।",
     "Teri kami mein ye dil rota hai,\nHar pal bas tujhe hi dhundhta hai।"
 ]
-
 LOVE_SHAYARI = [
     "Tumhari muskaan hi meri jaan hai,\nTumse hi meri pehchaan hai।",
     "Ishq tumse kuch is tarah hai,\nJaise saans se zindagi।",
     "Teri aankhon mein doob jana hai,\nBas tujh mein hi kho jana hai।",
     "Tum mil gaye to laga,\nMujhe meri duniya mil gayi।"
 ]
-
 ATTITUDE_SHAYARI = [
     "Hum se jalne wale bhi kamaal ke hote hai,\nMehfil apni aur charche hamare।",
     "Naam hi kaafi hai,\nPehchaan banane ke liye।",
     "Hum wahi hai jo dikhte hai,\nAur jo nahi dikhte wo khatarnaak hai।",
     "Taqat se nahi, aukaat se baat hoti hai,\nAur hamari aukaat tum soch bhi nahi sakte।"
 ]
-
 SAD_SHAYARI = [
     "Aansu bhi kitne ajeeb hote hai,\nKhushi mein bhi aa jate hai।",
     "Tanha rehna seekh liya hai,\nAb kisi ki zarurat nahi।",
@@ -78,12 +75,13 @@ async def get_owner_mention():
         return "KING"
 
 def human_reply(text, owner_mention):
-    if "owner" in text.lower() or "malik" in text.lower() or "bnaya kisne" in text.lower():
+    text = text.lower()
+    if "owner" in text or "malik" in text or "bnaya kisne" in text:
         return f"मेरे KING 👑 ये रहे - {owner_mention}"
     learned = recall(text)
     if learned:
         return learned
-    replies = ["hmm", "acha", "sahi hai", "fir?", "bol kya scene hai", "haan bol", "sun raha hu"]
+    replies = ["hmm", "acha", "sahi hai", "fir?", "bol kya scene hai", "haan bol", "sun raha hu", "kya hua"]
     return random.choice(replies)
 
 # ============= FLASK =============
@@ -205,7 +203,7 @@ async def group_ai(_, m: Message):
         reply = human_reply(m.text, owner_mention)
         await m.reply_text(reply)
     except Exception as e:
-        print(f"Group Error: {e}")
+        print(f"Group Error Ignore: {e}") # CRASH NAHI HOGA
 
 @app.on_message(filters.private & ~filters.me)
 async def pm_ai(_, m: Message):
@@ -225,7 +223,7 @@ async def pm_ai(_, m: Message):
         reply = human_reply(m.text, owner_mention)
         await m.reply_text(reply)
     except Exception as e:
-        print(f"PM Error: {e}")
+        print(f"PM Error Ignore: {e}")
 
 # ============= START =============
 if __name__ == "__main__":
