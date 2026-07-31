@@ -229,15 +229,7 @@ async def private_ai(_, m: Message):
     if m.text:
         await m.reply_text(await ai_reply(m.text))
 
-# ================= START FOR WEB SERVICE =================
-def run_bot():
-    print("🔥 ISHIKA AI USERBOT WEB SERVICE PE STARTED 🔥")
-    app.run()
-
+# ================= START =================
 if __name__ == "__main__":
-    keep_alive() # Flask server for Render
-    threading.Thread(target=run_bot, daemon=True).start()
-
-    # Web Service ko sleep hone se rokne ke liye
-    while True:
-        time.sleep(1000)
+    print("🔥 ISHIKA AI USERBOT RAILWAY PE STARTED 🔥")
+    app.run()
