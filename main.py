@@ -1,6 +1,8 @@
 import os
 import sys
 import random
+import time
+import threading
 import asyncio
 import aiohttp
 from dotenv import load_dotenv
@@ -92,7 +94,7 @@ async def ai_reply(text):
 # ================= COMMANDS =================
 @app.on_message(filters.me & filters.command("help", [".","/"]))
 async def help_cmd(_, m):
-    help_text = """**🤖 ISHIKA AI USERBOT - RENDER**\n
+    help_text = """**🤖 ISHIKA AI USERBOT - RENDER FREE**\n
 **AI Commands**
 `.autoai on/off` - Group AI ON/OFF
 `.aimode normal/savage/gf/funny` - AI Mood
@@ -108,7 +110,7 @@ async def help_cmd(_, m):
     await m.edit(help_text)
 
 @app.on_message(filters.me & filters.command("ping", [".","/"]))
-async def ping(_, m): await m.edit("🏓 PONG - Render pe Zinda hu")
+async def ping(_, m): await m.edit("🏓 PONG - Web Service pe Zinda hu")
 
 @app.on_message(filters.me & filters.command("autoai", [".","/"]) & filters.group)
 async def autoai(_, m):
@@ -169,7 +171,7 @@ async def restart(_, m):
     await m.edit("♻️ Restarting...")
     os.execl(sys.executable, sys.executable, *sys.argv)
 
-# ============ ANYSNAP COMMAND - FIXED ============
+# ============ ANYSNAP COMMAND ============
 ANIME_APIS = [
     "https://api.waifu.pics/sfw/waifu",
     "https://api.waifu.pics/sfw/neko",
@@ -228,8 +230,15 @@ async def private_ai(_, m: Message):
     if m.text:
         await m.reply_text(await ai_reply(m.text))
 
-# ================= START =================
-if __name__ == "__main__":
-    keep_alive()
-    print("🔥 ISHIKA AI USERBOT RENDER PE STARTED 🔥")
+# ================= START FOR WEB SERVICE =================
+def run_bot():
+    print("🔥 ISHIKA AI USERBOT WEB SERVICE PE STARTED 🔥")
     app.run()
+
+if __name__ == "__main__":
+    keep_alive() # Flask server for Render
+    threading.Thread(target=run_bot, daemon=True).start()
+
+    # Web Service ko sleep hone se rokne ke liye
+    while True:
+        time.sleep(1000)
