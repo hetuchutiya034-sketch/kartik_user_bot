@@ -8,6 +8,7 @@ from pyrogram import Client, filters
 from pyrogram.types import Message
 from flask import Flask
 from threading import Thread
+from pyrogram.enums import ChatAction
 
 API_ID = int(os.environ.get("API_ID"))
 API_HASH = os.environ.get("API_HASH")
@@ -225,7 +226,7 @@ async def pm_ai(_, m: Message):
     if not m.text:
         return
     await asyncio.sleep(random.uniform(1, 2.5))
-    await app.send_chat_action(m.chat.id, "typing")
+    await app.send_chat_action(m.chat.id, ChatAction.TYPING)
     time.sleep(1)
     reply = human_reply(m.text, owner_mention)
     await m.reply_text(reply)
