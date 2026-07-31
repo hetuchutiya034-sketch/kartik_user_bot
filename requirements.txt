@@ -1,5 +1,6 @@
 pyrogram
 tgcrypto
-flask
+openai
 python-dotenv
-pillow
+gtts
+aiohttp
