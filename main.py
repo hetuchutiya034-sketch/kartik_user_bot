@@ -6,28 +6,33 @@ load_dotenv()
 
 from pyrogram import Client, filters
 from pyrogram.types import Message
-from openai import OpenAI
+import google.generativeai as genai
 
 # ================= CONFIG =================
 API_ID = int(os.getenv("API_ID", 0))
 API_HASH = os.getenv("API_HASH")
 SESSION = os.getenv("SESSION")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") # <-- NAAM CHANGE
 
-# DEBUG - Railway logs me check kar lena
+# DEBUG
 print("="*30)
 print("DEBUG: API_ID =", API_ID)
 print("DEBUG: API_HASH mil rahi hai =", "HAAN" if API_HASH else "NAHI")
 print("DEBUG: SESSION mil rahi hai =", "HAAN" if SESSION else "NAHI")
-print("DEBUG: OPENAI_KEY mil rahi hai =", "HAAN" if OPENAI_API_KEY else "NAHI")
+print("DEBUG: GEMINI_KEY mil rahi hai =", "HAAN" if GEMINI_API_KEY else "NAHI")
 print("="*30)
 
 if not API_ID or not API_HASH or not SESSION:
-    print("❌ ERROR: API_ID, API_HASH, ya SESSION missing hai. Railway Variables check karo")
+    print("❌ ERROR: API_ID, API_HASH, ya SESSION missing hai")
     exit()
 
-if not OPENAI_API_KEY:
-    print("⚠️ WARNING: OPENAI_API_KEY nahi hai. AI reply kaam nahi karega")
+# Gemini Config
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
+    model = genai.GenerativeModel('gemini-1.5-flash')
+else:
+    model = None
+    print("⚠️ WARNING: GEMINI_API_KEY nahi hai. AI reply kaam nahi karega")
 
 app = Client(
     name="ishikauserbot",
@@ -35,8 +40,6 @@ app = Client(
     api_hash=API_HASH,
     session_string=SESSION
 )
-
-client_ai = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 
 # ================= GLOBAL =================
 ai_groups = {}
@@ -85,22 +88,16 @@ async def reset(_, m):
     user_memory.clear()
     await m.edit("Memory cleared ✅")
 
-# ================= AI =================
+# ================= AI GEMINI =================
 async def ai_reply(uid, text):
-    if not client_ai: return "AI Key nahi lagi hai 😅"
-    hist = user_memory.get(uid, [])
-    msgs = [{"role":"system","content":MODES[ai_mode]}] + hist[-6:]
-    msgs.append({"role":"user","content":text})
+    if not model: return "AI Key nahi lagi hai 😅"
+
+    system_prompt = MODES[ai_mode]
+    full_prompt = f"{system_prompt}\n\nUser: {text}\nBot:"
 
     try:
-        res = client_ai.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=msgs,
-            max_tokens=150
-        )
-        reply = res.choices[0].message.content
-        hist += [{"role":"user","content":text},{"role":"assistant","content":reply}]
-        user_memory[uid]=hist[-10:]
+        res = model.generate_content(full_prompt)
+        reply = res.text
         return reply
     except Exception as e:
         return f"AI error: {str(e)[:100]} 😅"
@@ -130,5 +127,5 @@ async def att(_, m): await m.edit(random.choice(ATTITUDE))
 async def gf(_, m): await m.edit(random.choice(GF))
 
 # ================= START =================
-print("🔥 FULL AI USERBOT STARTED 🔥")
+print("🔥 FULL AI USERBOT STARTED WITH GEMINI 🔥")
 app.run()
