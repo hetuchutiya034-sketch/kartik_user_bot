@@ -3,5 +3,3 @@ tgcrypto
 python-dotenv
 groq
 aiohttp
-flask
-gunicorn
