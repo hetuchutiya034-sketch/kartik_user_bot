@@ -1,235 +1,239 @@
 import os
-import sys
 import random
-import time
-import threading
+import sqlite3
+import requests
 import asyncio
-import aiohttp
-from dotenv import load_dotenv
-load_dotenv()
-
+import time
 from pyrogram import Client, filters
 from pyrogram.types import Message
-from groq import Groq
+from flask import Flask
+from threading import Thread
 
-# ================= CONFIG =================
-API_ID = int(os.getenv("API_ID", 0))
-API_HASH = os.getenv("API_HASH")
-SESSION = os.getenv("SESSION")
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-OWNER_ID = int(os.getenv("OWNER_ID", 0))
+API_ID = int(os.environ.get("API_ID"))
+API_HASH = os.environ.get("API_HASH")
+SESSION = os.environ.get("SESSION")
+OWNER_ID = int(os.environ.get("OWNER_ID", 0))
 
-print("="*30)
-print("DEBUG: GROQ_KEY =", "MIL GAYI" if GROQ_API_KEY else "NAHI HAI")
-print("="*30)
+app = Client(name="kartikuserbot", api_id=API_ID, api_hash=API_HASH, session_string=SESSION)
+app.set_parse_mode("html")
+flask_app = Flask(__name__)
 
-if not API_ID or not API_HASH or not SESSION:
-    exit("❌ ERROR: API_ID, API_HASH, ya SESSION missing hai")
+# ============= DATABASE =============
+conn = sqlite3.connect('memory.db', check_same_thread=False)
+c = conn.cursor()
+c.execute('CREATE TABLE IF NOT EXISTS memory (question TEXT, answer TEXT)')
+c.execute('CREATE TABLE IF NOT EXISTS groups (chat_id INTEGER)')
+conn.commit()
 
-client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
-app = Client(name="ishikauserbot", api_id=API_ID, api_hash=API_HASH, session_string=SESSION)
-
-# ================= DATA ANDAR HI HAI =================
-DATA = {
-  "shayari": {
-    "all": [
-      "Tere naam se mohabbat ki hai, tere ehsaas se ishq kiya hai",
-      "Dil kehta hai tu mil jaaye, duniya ki har khushi mil jaaye",
-      "Chand bhi sharma jaye teri ada se, itni khoobsurat tu hai"
-    ],
-    "love": [
-      "Tum pass ho to har dard dawa lagta hai",
-      "Teri ek jhalak ke liye dil bechain rehta hai",
-      "Ishq tumse hai, baaki sab se matlab nahi"
-    ],
-    "sad": [
-      "Tum bin zindagi adhoori lagti hai",
-      "Jo apne the wo bhi ab paraye lagte hain",
-      "Dil toota hai par shor nahi karte"
-    ],
-    "attitude": [
-      "Mera attitude mera style hai, pasand aaye to theek warna bhad me jao",
-      "Main wahi hu jisko log copy karte hain",
-      "Tere jaise hazar aaye aur gaye"
-    ]
-  },
-  "roast": {
-    "all": ["battery 1% attitude 100%", "Google bhi tujhe search karke thak gaya", "Tere muh se gyan mat pel"],
-    "funny": ["tu wifi hai kya signal nahi aate", "Form bharne gaya tha, form ne mujhe bhar diya"]
-  }
-}
-
-SHAYARI_DATA = DATA["shayari"]
-ROAST_DATA = DATA["roast"]
-
-# ================= GLOBAL =================
-ai_groups = {}
-ai_mode = "normal"
+ai_groups = set()
 afk_status = False
-afk_reason = ""
+afk_reason = "King busy hai 👑"
 
-MODES = {
-    "normal": "You are a helpful Hinglish assistant. Reply in 2 lines max. Use emoji.",
-    "savage": "You are savage roasting Hinglish AI. Reply short and funny.",
-    "gf": "You are a sweet romantic girlfriend. Reply lovingly in Hinglish.",
-    "funny": "You are funny meme-style AI. Reply with jokes and emojis."
-}
+def remember(q, a):
+    c.execute("INSERT INTO memory VALUES (?,?)", (q.lower(), a))
+    conn.commit()
 
-# ================= AI FUNCTION =================
-async def ai_reply(text):
-    if not client: return "GROQ_API_KEY nahi lagi hai 😅"
-    system_prompt = MODES[ai_mode]
-    full_prompt = f"{system_prompt}\n\nUser: {text}\nBot:"
-    try:
-        res = client.chat.completions.create(
-            messages=[{"role": "user", "content": full_prompt}],
-            model="llama-3.1-8b-instant",
-            max_tokens=300
-        )
-        return res.choices[0].message.content[:4000]
-    except Exception as e:
-        return f"AI error: {str(e)[:100]} 😅"
+def recall(q):
+    c.execute("SELECT answer FROM memory WHERE question LIKE?", ('%'+q.lower()+'%',))
+    data = c.fetchall()
+    return random.choice(data)[0] if data else None
 
-# ================= COMMANDS =================
-@app.on_message(filters.me & filters.command("help", [".","/"]))
-async def help_cmd(_, m):
-    help_text = """**🤖 ISHIKA AI USERBOT - RENDER FREE**\n
-**AI Commands**
-`.autoai on/off` - Group AI ON/OFF
-`.aimode normal/savage/gf/funny` - AI Mood
-`.ask <question>` - AI se pucho
-
-**Fun + Utility**
-`.ping.bio.info.coin.roast.afk.restart`
-
-**Content**
-`.shayari <category>`
-`.anysnap` - Random anime pic
-"""
-    await m.edit(help_text)
-
-@app.on_message(filters.me & filters.command("ping", [".","/"]))
-async def ping(_, m): await m.edit("🏓 PONG - Web Service pe Zinda hu")
-
-@app.on_message(filters.me & filters.command("autoai", [".","/"]) & filters.group)
-async def autoai(_, m):
-    cid = m.chat.id
-    if len(m.command)<2: return await m.edit("Use: `.autoai on` ya `.autoai off`")
-    ai_groups[cid] = m.command[1]=="on"
-    status = "ON ✅" if ai_groups[cid] else "OFF ❌"
-    await m.edit(f"🤖 **AI AUTO REPLY {status}**")
-
-@app.on_message(filters.me & filters.command("aimode", [".","/"]))
-async def mode(_, m):
-    global ai_mode
-    if len(m.command)<2: return await m.edit("Use: `.aimode normal/savage/gf/funny`")
-    if m.command[1] in MODES:
-        ai_mode = m.command[1]
-        await m.edit(f"Mode changed: **{ai_mode}** 🔥")
-    else:
-        await m.edit("Galat mode")
-
-@app.on_message(filters.me & filters.command("ask", [".","/"]))
-async def ask(_, m):
-    if len(m.command) < 2: return await m.edit("Use: `.ask ye code kya karta hai`")
-    q = " ".join(m.command[1:])
-    msg = await m.edit("🤔 Soch raha...")
-    await msg.edit(await ai_reply(q))
-
-@app.on_message(filters.me & filters.command("roast", [".","/"]))
-async def roast(_, m):
-    if not m.reply_to_message:
-        return await m.edit("Kisi ke msg ko reply karke `.roast` karo")
-    category = m.command[1] if len(m.command) > 1 else "all"
-    data = ROAST_DATA.get(category, ROAST_DATA.get("all"))
-    await m.edit(f"**{m.reply_to_message.from_user.first_name}**\n{random.choice(data)}")
-
-@app.on_message(filters.me & filters.command("coin", [".","/"]))
-async def coin(_, m):
-    await m.edit(f"🪙 Result: **{random.choice(['HEADS','TAILS'])}**")
-
-@app.on_message(filters.me & filters.command("bio", [".","/"]))
-async def bio(_, m):
-    user = m.reply_to_message.from_user if m.reply_to_message else m.from_user
-    await m.edit(f"**Name:** {user.first_name}\n**Username:** @{user.username}\n**ID:** `{user.id}`")
-
-@app.on_message(filters.me & filters.command("info", [".","/"]))
-async def info(_, m):
-    chat = await app.get_chat(m.chat.id)
-    await m.edit(f"**Group:** {chat.title}\n**Members:** {chat.members_count}\n**ID:** `{chat.id}`")
-
-@app.on_message(filters.me & filters.command("afk", [".","/"]))
-async def afk(_, m):
-    global afk_status, afk_reason
-    afk_status = True
-    afk_reason = " ".join(m.command[1:]) if len(m.command) > 1 else "AFK"
-    await m.edit(f"💤 **AFK ON**\nReason: {afk_reason}")
-
-@app.on_message(filters.me & filters.command("restart", [".","/"]))
-async def restart(_, m):
-    await m.edit("♻️ Restarting...")
-    os.execl(sys.executable, sys.executable, *sys.argv)
-
-# ============ ANYSNAP COMMAND ============
-ANIME_APIS = [
-    "https://api.waifu.pics/sfw/waifu",
-    "https://api.waifu.pics/sfw/neko",
-    "https://api.waifu.pics/sfw/shinobu",
-    "https://api.waifu.pics/sfw/megumin",
-    "https://api.waifu.pics/sfw/cuddle"
+# ============= SHAYARI LISTS =============
+DARD_SHAYARI = [
+    "Dil tod ke wo muskura rahe hai,\nHum unhe yaad karke ro rahe hai।",
+    "Zakhm itne mile zindagi mein,\nAb dard bhi mehmaan lagta hai।",
+    "Mohabbat bhi kitni ajeeb hoti hai,\nJo apna hota hai wahi door hota hai।",
+    "Raat bhar rota raha dil mera,\nAur subah duniya ne kaha 'sab theek hai'",
+    "Chup rehna hi behtar hai,\nLog sun kar bhi samajhte nahi।",
+    "Tere bina jeena mushkil hai,\nPar tere saath rehna namumkin।",
+    "Dil ke tukde hue hai aise,\nJaise koi sheesha toot gaya।",
+    "Waqt ne sab sikha diya,\nAb kisi pe bharosa nahi।",
+    "Unhone kaha bhool jao hume,\nHumne kaha yaad hi kab the tum।",
+    "Dard likhne ki aadat si ho gayi hai,\nAb khushi bhi ajeeb lagti hai।"
 ]
 
-@app.on_message(filters.me & filters.command("anysnap", [".","/"]))
-async def anysnap(_, m):
-    msg = await m.edit("🎌 Loading random anime pic...")
+LOVE_SHAYARI = [
+    "Tumhari muskaan hi meri jaan hai,\nTumse hi meri pehchaan hai।",
+    "Ishq tumse kuch is tarah hai,\nJaise saans se zindagi।",
+    "Teri aankhon mein doob jana hai,\nBas tujh mein hi kho jana hai।",
+    "Tum ho to sab kuch hai,\nTum nahi to kuch bhi nahi।",
+    "Dil ne tujhe apna maana hai,\nHar pal bas tera hi deewana hai।",
+    "Tere bina adhoori si lagti hai zindagi,\nTu ho to sab kuch poora।",
+    "Mohabbat mein shartein nahi hoti,\nSirf ehsaas hota hai।",
+    "Teri har baat dil ko choo jati hai,\nTu hi meri duniya hai।",
+    "Tujhse milkar jaana,\nKya hoti hai asli mohabbat।",
+    "Bas ek tu hi kaafi hai,\nMeri poori duniya ke liye।"
+]
+
+ATTITUDE_SHAYARI = [
+    "Hum se jalne wale bhi kamaal ke hote hai,\nMehfil apni aur charche hamare।",
+    "Naam hi kaafi hai,\nPehchaan banane ke liye।",
+    "Hum wahi hai jo dikhte hai,\nAur jo nahi dikhte wo khatarnaak hai।",
+    "Zindagi apni terms par jeete hai,\nKisi ke kehne se nahi।",
+    "Royal attitude hai apna,\nLog jalte hai to jalne do।",
+    "Humse panga mat lena,\nHistory bhi dangerous hai।",
+    "Apni aukaat mein rehna seekh lo,\nHumse takraoge to bikhar jaoge।",
+    "Sher apna shikar khud karta hai,\nAur hum apni pehchaan।",
+    "Hum khamosh zaroor hai,\nPar kamzor nahi।",
+    "Style aisa rakho,\nKi duniya dekhte reh jaaye।"
+]
+
+SAD_SHAYARI = [
+    "Aansu bhi kitne ajeeb hote hai,\nKhushi mein bhi aa jate hai।",
+    "Tanha rehna seekh liya hai,\nAb kisi ki zarurat nahi।",
+    "Dil ke armaan aansuon mein beh gaye,\nHum wafa karte karte reh gaye।",
+    "Kisi ko chahna galti nahi,\nPar usse expect karna galti hai।",
+    "Zindagi ne sikhaya hai,\nApno par bhi bharosa na karo।",
+    "Kabhi kabhi dil karta hai,\nSab kuch chhod kar chale jaaye।",
+    "Dard itna hai ke bayaan nahi hota,\nAur log kehte hai kuch hua hi nahi।",
+    "Khamoshi bhi ek jawab hai,\nJab bolna bekaar ho।",
+    "Kuch log bas yaadon mein hi ache lagte hai,\nHaqeeqat mein nahi।",
+    "Rishton ka bharosa toot jaye,\nTo sab khatam ho jata hai।"
+]
+
+# ============= HUMAN AI =============
+async def get_owner_mention():
     try:
-        timeout = aiohttp.ClientTimeout(total=10)
-        async with aiohttp.ClientSession(timeout=timeout) as session:
-            url = random.choice(ANIME_APIS)
-            async with session.get(url) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    img_url = data.get("url")
-                    await msg.delete()
-                    await app.send_photo(m.chat.id, img_url, caption="🎌 **AnySnap**")
-                else:
-                    await msg.edit("API down hai bhai, baad me try kar")
-    except Exception as e:
-        await msg.edit(f"Error: {str(e)[:100]}")
+        user = await app.get_users(OWNER_ID)
+        return f"@{user.username}" if user.username else f"<a href='tg://user?id={OWNER_ID}'>KING</a>"
+    except:
+        return "KING"
 
-# ============ SHAYARI COMMAND ============
-@app.on_message(filters.me & filters.command("shayari", [".","/"]))
-async def shayari(_, m):
-    category = m.command[1] if len(m.command) > 1 else "all"
-    data = SHAYARI_DATA.get(category, SHAYARI_DATA.get("all"))
-    await m.edit(random.choice(data))
+def human_reply(text, owner_mention):
+    if "owner" in text.lower() or "malik" in text.lower() or "bnaya kisne" in text.lower():
+        return f"मेरे KING 👑 ये रहे - {owner_mention}"
+    learned = recall(text)
+    if learned:
+        return learned
+    try:
+        r = requests.post("https://api.gemini.com/v1/generate", json={"prompt": f"Reply like a human named Kartik. Be cool, king attitude. Q: {text}"}, timeout=5)
+        reply = r.json().get("text", "hmm")
+    except:
+        reply = random.choice(["hmm", "acha", "sahi hai", "fir?", "bol kya scene hai"])
+    reply = reply.replace("मैं एक AI हूँ", "मैं KARTIK हूँ").replace("As an AI", "सुन")
+    return reply.strip()
 
-# ================= AI AUTO REPLY =================
+# ============= FLASK =============
+@flask_app.route('/')
+def home():
+    return "KARTIK KING USERBOT IS ALIVE 👑"
+def run_flask():
+    flask_app.run(host='0.0.0.0', port=8080)
+
+# ============= COMMANDS =============
+@app.on_message(filters.me & filters.command("ping", "."))
+async def ping(_, m: Message):
+    await m.edit("Pong 🏓 KING KARTIK Zinda hai")
+
+@app.on_message(filters.me & filters.command("autoai", "."))
+async def toggle_ai(_, m: Message):
+    chat_id = m.chat.id
+    if chat_id in ai_groups:
+        ai_groups.remove(chat_id)
+        c.execute("DELETE FROM groups WHERE chat_id=?", (chat_id,))
+        await m.edit("AUTO REPLY OFF ❌")
+    else:
+        ai_groups.add(chat_id)
+        c.execute("INSERT INTO groups VALUES (?)", (chat_id,))
+        await m.edit("AUTO REPLY ON ✅ Ab KARTIK khud baat karega")
+    conn.commit()
+
+@app.on_message(filters.me & filters.command("teach", "."))
+async def teach(_, m: Message):
+    try:
+        q, a = m.text.split(".teach ", 1)[1].split("|", 1)
+        remember(q.strip(), a.strip())
+        await m.edit(f"Seekh liya KING ✅\nQ: {q}\nA: {a}")
+    except:
+        await m.edit("Use:.teach sawal | jawab")
+
+@app.on_message(filters.me & filters.command("afk", "."))
+async def afk(_, m: Message):
+    global afk_status, afk_reason
+    afk_status = True
+    afk_reason = m.text.split(".afk ", 1)[1] if len(m.text.split()) > 1 else "King busy hai 👑"
+    await m.edit(f"AFK ON 💤 Reason: {afk_reason}")
+
+@app.on_message(filters.me & filters.command("tagall", "."))
+async def tagall(_, m: Message):
+    if not m.chat.id: return
+    await m.delete()
+    txt = m.text.split(".tagall ", 1)[1] if len(m.text.split()) > 1 else "Sab aa jao 👑"
+    members = []
+    async for member in app.get_chat_members(m.chat.id):
+        if not member.user.is_bot:
+            members.append(f"<a href='tg://user?id={member.user.id}'>ㅤ</a>")
+    mention = ""
+    count = 0
+    for i in members:
+        mention += i
+        count += 1
+        if count == 5:
+            await app.send_message(m.chat.id, f"{txt}\n{mention}")
+            mention = ""
+            count = 0
+            await asyncio.sleep(2)
+    if mention:
+        await app.send_message(m.chat.id, f"{txt}\n{mention}")
+
+# SHAYARI COMMANDS
+@app.on_message(filters.me & filters.command("dard", "."))
+async def dard(_, m: Message):
+    await m.edit(f"💔 DARD SHAYARI 💔\n\n{random.choice(DARD_SHAYARI)}")
+
+@app.on_message(filters.me & filters.command("love", "."))
+async def love(_, m: Message):
+    await m.edit(f"❤️ LOVE SHAYARI ❤️\n\n{random.choice(LOVE_SHAYARI)}")
+
+@app.on_message(filters.me & filters.command("attitude", "."))
+async def attitude(_, m: Message):
+    await m.edit(f"😈 ATTITUDE SHAYARI 😈\n\n{random.choice(ATTITUDE_SHAYARI)}")
+
+@app.on_message(filters.me & filters.command("sad", "."))
+async def sad(_, m: Message):
+    await m.edit(f"😢 SAD SHAYARI 😢\n\n{random.choice(SAD_SHAYARI)}")
+
+# ============= AUTO REPLY + STICKER ECHO =============
 @app.on_message(filters.group & ~filters.me)
 async def group_ai(_, m: Message):
     global afk_status
-    me = await app.get_me()
-
+    owner_mention = await get_owner_mention()
     if afk_status and m.reply_to_message and m.reply_to_message.from_user.id == OWNER_ID:
-        await m.reply(f"💤 Me AFK hu: {afk_reason}")
-        afk_status = False
+        await m.reply(f"💤 KING AFK hai: {afk_reason}")
         return
-
-    if not ai_groups.get(m.chat.id): return
-    if not m.text: return
-
-    is_reply_to_me = m.reply_to_message and m.reply_to_message.from_user.id == OWNER_ID
-    is_tag = f"@{me.username.lower()}" in m.text.lower()
-
-    if is_reply_to_me or is_tag:
-        await m.reply_text(await ai_reply(m.text))
+    if m.chat.id not in ai_groups:
+        return
+    if m.sticker:
+        await asyncio.sleep(1)
+        await m.reply_sticker(m.sticker.file_id)
+        return
+    if not m.text:
+        return
+    await asyncio.sleep(random.uniform(1.5, 3.5))
+    await app.send_chat_action(m.chat.id, "typing")
+    time.sleep(1)
+    reply = human_reply(m.text, owner_mention)
+    await m.reply_text(reply)
 
 @app.on_message(filters.private & ~filters.me)
-async def private_ai(_, m: Message):
-    if m.text:
-        await m.reply_text(await ai_reply(m.text))
+async def pm_ai(_, m: Message):
+    owner_mention = await get_owner_mention()
+    if m.sticker:
+        await asyncio.sleep(1)
+        await m.reply_sticker(m.sticker.file_id)
+        return
+    if not m.text:
+        return
+    await asyncio.sleep(random.uniform(1, 2.5))
+    await app.send_chat_action(m.chat.id, "typing")
+    time.sleep(1)
+    reply = human_reply(m.text, owner_mention)
+    await m.reply_text(reply)
 
-# ================= START =================
+# ============= START =============
 if __name__ == "__main__":
-    print("🔥 ISHIKA AI USERBOT RAILWAY PE STARTED 🔥")
+    for row in c.execute("SELECT chat_id FROM groups"):
+        ai_groups.add(row[0])
+    Thread(target=run_flask).start()
+    print("👑 KARTIK KING USERBOT STARTED 👑")
     app.run()
