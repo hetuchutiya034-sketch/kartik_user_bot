@@ -4,3 +4,4 @@ python-dotenv
 groq
 aiohttp
 requests
+flask
