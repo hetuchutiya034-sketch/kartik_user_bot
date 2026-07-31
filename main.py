@@ -1,9 +1,7 @@
 import os
 import random
 import sqlite3
-import requests
 import asyncio
-import time
 from pyrogram import Client, filters
 from pyrogram.types import Message
 from flask import Flask
@@ -24,9 +22,11 @@ conn = sqlite3.connect('memory.db', check_same_thread=False)
 c = conn.cursor()
 c.execute('CREATE TABLE IF NOT EXISTS memory (question TEXT, answer TEXT)')
 c.execute('CREATE TABLE IF NOT EXISTS groups (chat_id INTEGER)')
+c.execute('CREATE TABLE IF NOT EXISTS dms (user_id INTEGER)')
 conn.commit()
 
 ai_groups = set()
+ai_dms = set()
 afk_status = False
 afk_reason = "King busy hai 👑"
 
@@ -43,53 +43,25 @@ def recall(q):
 DARD_SHAYARI = [
     "Dil tod ke wo muskura rahe hai,\nHum unhe yaad karke ro rahe hai।",
     "Zakhm itne mile zindagi mein,\nAb dard bhi mehmaan lagta hai।",
-    "Mohabbat bhi kitni ajeeb hoti hai,\nJo apna hota hai wahi door hota hai।",
-    "Raat bhar rota raha dil mera,\nAur subah duniya ne kaha 'sab theek hai'",
-    "Chup rehna hi behtar hai,\nLog sun kar bhi samajhte nahi।",
-    "Tere bina jeena mushkil hai,\nPar tere saath rehna namumkin।",
-    "Dil ke tukde hue hai aise,\nJaise koi sheesha toot gaya।",
-    "Waqt ne sab sikha diya,\nAb kisi pe bharosa nahi।",
-    "Unhone kaha bhool jao hume,\nHumne kaha yaad hi kab the tum।",
-    "Dard likhne ki aadat si ho gayi hai,\nAb khushi bhi ajeeb lagti hai।"
+    "Mohabbat bhi kitni ajeeb hoti hai,\nJo apna hota hai wahi door hota hai।"
 ]
 
 LOVE_SHAYARI = [
     "Tumhari muskaan hi meri jaan hai,\nTumse hi meri pehchaan hai।",
     "Ishq tumse kuch is tarah hai,\nJaise saans se zindagi।",
-    "Teri aankhon mein doob jana hai,\nBas tujh mein hi kho jana hai।",
-    "Tum ho to sab kuch hai,\nTum nahi to kuch bhi nahi।",
-    "Dil ne tujhe apna maana hai,\nHar pal bas tera hi deewana hai।",
-    "Tere bina adhoori si lagti hai zindagi,\nTu ho to sab kuch poora।",
-    "Mohabbat mein shartein nahi hoti,\nSirf ehsaas hota hai।",
-    "Teri har baat dil ko choo jati hai,\nTu hi meri duniya hai।",
-    "Tujhse milkar jaana,\nKya hoti hai asli mohabbat।",
-    "Bas ek tu hi kaafi hai,\nMeri poori duniya ke liye।"
+    "Teri aankhon mein doob jana hai,\nBas tujh mein hi kho jana hai।"
 ]
 
 ATTITUDE_SHAYARI = [
     "Hum se jalne wale bhi kamaal ke hote hai,\nMehfil apni aur charche hamare।",
     "Naam hi kaafi hai,\nPehchaan banane ke liye।",
-    "Hum wahi hai jo dikhte hai,\nAur jo nahi dikhte wo khatarnaak hai।",
-    "Zindagi apni terms par jeete hai,\nKisi ke kehne se nahi।",
-    "Royal attitude hai apna,\nLog jalte hai to jalne do।",
-    "Humse panga mat lena,\nHistory bhi dangerous hai।",
-    "Apni aukaat mein rehna seekh lo,\nHumse takraoge to bikhar jaoge।",
-    "Sher apna shikar khud karta hai,\nAur hum apni pehchaan।",
-    "Hum khamosh zaroor hai,\nPar kamzor nahi।",
-    "Style aisa rakho,\nKi duniya dekhte reh jaaye।"
+    "Hum wahi hai jo dikhte hai,\nAur jo nahi dikhte wo khatarnaak hai।"
 ]
 
 SAD_SHAYARI = [
     "Aansu bhi kitne ajeeb hote hai,\nKhushi mein bhi aa jate hai।",
     "Tanha rehna seekh liya hai,\nAb kisi ki zarurat nahi।",
-    "Dil ke armaan aansuon mein beh gaye,\nHum wafa karte karte reh gaye।",
-    "Kisi ko chahna galti nahi,\nPar usse expect karna galti hai।",
-    "Zindagi ne sikhaya hai,\nApno par bhi bharosa na karo।",
-    "Kabhi kabhi dil karta hai,\nSab kuch chhod kar chale jaaye।",
-    "Dard itna hai ke bayaan nahi hota,\nAur log kehte hai kuch hua hi nahi।",
-    "Khamoshi bhi ek jawab hai,\nJab bolna bekaar ho।",
-    "Kuch log bas yaadon mein hi ache lagte hai,\nHaqeeqat mein nahi।",
-    "Rishton ka bharosa toot jaye,\nTo sab khatam ho jata hai।"
+    "Dil ke armaan aansuon mein beh gaye,\nHum wafa karte karte reh gaye।"
 ]
 
 # ============= HUMAN AI =============
@@ -106,13 +78,8 @@ def human_reply(text, owner_mention):
     learned = recall(text)
     if learned:
         return learned
-    try:
-        r = requests.post("https://api.gemini.com/v1/generate", json={"prompt": f"Reply like a human named Kartik. Be cool, king attitude. Q: {text}"}, timeout=5)
-        reply = r.json().get("text", "hmm")
-    except:
-        reply = random.choice(["hmm", "acha", "sahi hai", "fir?", "bol kya scene hai"])
-    reply = reply.replace("मैं एक AI हूँ", "मैं KARTIK हूँ").replace("As an AI", "सुन")
-    return reply.strip()
+    replies = ["hmm", "acha", "sahi hai", "fir?", "bol kya scene hai", "haan bol", "sun raha hu"]
+    return random.choice(replies)
 
 # ============= FLASK =============
 @flask_app.route('/')
@@ -126,17 +93,64 @@ def run_flask():
 async def ping(_, m: Message):
     await m.edit("Pong 🏓 KING KARTIK Zinda hai")
 
+@app.on_message(filters.me & filters.command("help", "."))
+async def help_menu(_, m: Message):
+    menu = """
+👑 <b>KARTIK KING USERBOT MENU</b> 👑
+
+<b>1. BASIC</b>
+<code>.ping</code> - Bot check
+<code>.autoai</code> - Group me auto reply on/off
+<code>.dmai</code> - Sirf us DM me auto reply on/off
+
+<b>2. AI MEMORY</b>
+<code>.teach sawal | jawab</code> - Bot ko sikhana
+Ex: <code>.teach hello | Hello KING 👑</code>
+
+<b>3. UTILITY</b>
+<code>.afk reason</code> - AFK lagana
+<code>.tagall msg</code> - Sabko tag karna
+
+<b>4. SHAYARI</b> 💔
+<code>.dard</code> - Dard shayari
+<code>.love</code> - Love shayari
+<code>.attitude</code> - Attitude shayari
+<code>.sad</code> - Sad shayari
+
+<b>EXTRA</b>
+Sticker bhejo → Bot bhi wahi sticker bhejega
+
+Made by KING KARTIK 👑
+"""
+    await m.edit(menu)
+
 @app.on_message(filters.me & filters.command("autoai", "."))
 async def toggle_ai(_, m: Message):
     chat_id = m.chat.id
     if chat_id in ai_groups:
         ai_groups.remove(chat_id)
         c.execute("DELETE FROM groups WHERE chat_id=?", (chat_id,))
-        await m.edit("AUTO REPLY OFF ❌")
+        await m.edit("GROUP AUTO REPLY OFF ❌")
     else:
         ai_groups.add(chat_id)
         c.execute("INSERT INTO groups VALUES (?)", (chat_id,))
-        await m.edit("AUTO REPLY ON ✅ Ab KARTIK khud baat karega")
+        await m.edit("GROUP AUTO REPLY ON ✅")
+    conn.commit()
+
+@app.on_message(filters.me & filters.command("dmai", "."))
+async def toggle_dm(_, m: Message):
+    if not m.chat.id > 0:
+        await m.edit("Ye command sirf DM me use karo")
+        return
+    user_id = m.chat.id
+    if user_id in ai_dms:
+        ai_dms.remove(user_id)
+        c.execute("DELETE FROM dms WHERE user_id=?", (user_id,))
+        await m.edit("DM AUTO REPLY OFF ❌ Ab is bande ko reply nahi jaayega")
+    else:
+        ai_dms.add(user_id)
+        c.execute("INSERT INTO dms VALUES (?)", (user_id,))
+        await m.edit("DM AUTO REPLY ON ✅ Ab sirf is bande ko reply jaayega")
     conn.commit()
 
 @app.on_message(filters.me & filters.command("teach", "."))
@@ -157,27 +171,22 @@ async def afk(_, m: Message):
 
 @app.on_message(filters.me & filters.command("tagall", "."))
 async def tagall(_, m: Message):
-    if not m.chat.id: return
-    await m.delete()
+    try: await m.delete()
+    except: pass
     txt = m.text.split(".tagall ", 1)[1] if len(m.text.split()) > 1 else "Sab aa jao 👑"
     members = []
     async for member in app.get_chat_members(m.chat.id):
         if not member.user.is_bot:
             members.append(f"<a href='tg://user?id={member.user.id}'>ㅤ</a>")
-    mention = ""
-    count = 0
+    mention = ""; count = 0
     for i in members:
-        mention += i
-        count += 1
+        mention += i; count += 1
         if count == 5:
             await app.send_message(m.chat.id, f"{txt}\n{mention}")
-            mention = ""
-            count = 0
-            await asyncio.sleep(2)
+            mention = ""; count = 0; await asyncio.sleep(3)
     if mention:
         await app.send_message(m.chat.id, f"{txt}\n{mention}")
 
-# SHAYARI COMMANDS
 @app.on_message(filters.me & filters.command("dard", "."))
 async def dard(_, m: Message):
     await m.edit(f"💔 DARD SHAYARI 💔\n\n{random.choice(DARD_SHAYARI)}")
@@ -211,13 +220,15 @@ async def group_ai(_, m: Message):
     if not m.text:
         return
     await asyncio.sleep(random.uniform(1.5, 3.5))
-    await app.send_chat_action(m.chat.id, "typing")
-    time.sleep(1)
+    await app.send_chat_action(m.chat.id, ChatAction.TYPING)
+    await asyncio.sleep(1)
     reply = human_reply(m.text, owner_mention)
     await m.reply_text(reply)
 
 @app.on_message(filters.private & ~filters.me)
 async def pm_ai(_, m: Message):
+    if m.from_user.id not in ai_dms:
+        return
     owner_mention = await get_owner_mention()
     if m.sticker:
         await asyncio.sleep(1)
@@ -227,7 +238,7 @@ async def pm_ai(_, m: Message):
         return
     await asyncio.sleep(random.uniform(1, 2.5))
     await app.send_chat_action(m.chat.id, ChatAction.TYPING)
-    time.sleep(1)
+    await asyncio.sleep(1)
     reply = human_reply(m.text, owner_mention)
     await m.reply_text(reply)
 
@@ -235,6 +246,8 @@ async def pm_ai(_, m: Message):
 if __name__ == "__main__":
     for row in c.execute("SELECT chat_id FROM groups"):
         ai_groups.add(row[0])
+    for row in c.execute("SELECT user_id FROM dms"):
+        ai_dms.add(row[0])
     Thread(target=run_flask).start()
     print("👑 KARTIK KING USERBOT STARTED 👑")
     app.run()
