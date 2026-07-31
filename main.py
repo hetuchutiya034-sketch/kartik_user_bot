@@ -12,7 +12,7 @@ import google.generativeai as genai
 API_ID = int(os.getenv("API_ID", 0))
 API_HASH = os.getenv("API_HASH")
 SESSION = os.getenv("SESSION")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") # <-- NAAM CHANGE
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 # DEBUG
 print("="*30)
@@ -62,6 +62,31 @@ GF = ["""तू मेरी जान है, तू ही मेरी पह
 ALL = LOVE + SAD + ATTITUDE + GF
 
 # ================= COMMANDS =================
+
+@app.on_message(filters.me & filters.command("help", [".","/"]))
+async def help_cmd(_, m):
+    help_text = """**🤖 ISHIKA AI USERBOT - HELP**
+
+**AI Commands**
+`.autoai on/off` - Group me AI auto reply ON/OFF
+`.aimode normal/savage/gf/funny` - AI ka mood change
+`.resetai` - AI ki memory clear
+
+**Shayari Commands**
+`.shayari` - Random shayari
+`.shayarilove` - Love shayari
+`.shayarisad` - Sad shayari
+`.shayariattitude` - Attitude shayari
+`.shayarigf` - GF wali shayari
+
+**Utility**
+`.ping` - Bot check
+`.help` - Ye menu
+
+**AI Use:** Reply karke `bot` likho ya PM karo 🔥
+"""
+    await m.edit(help_text)
+
 @app.on_message(filters.me & filters.command("ping", [".","/"]))
 async def ping(_, m): await m.edit("🏓 PONG")
 
@@ -79,7 +104,7 @@ async def mode(_, m):
     if len(m.command)<2: return await m.edit("Use: `.aimode normal/savage/gf/funny`")
     if m.command[1] in MODES:
         ai_mode = m.command[1]
-        await m.edit(f"Mode changed to: **{ai_mode}**")
+        await m.edit(f"Mode changed to: **{ai_mode}** 🔥")
     else:
         await m.edit("Galat mode. Use: normal/savage/gf/funny")
 
@@ -98,21 +123,23 @@ async def ai_reply(uid, text):
     try:
         res = model.generate_content(full_prompt)
         reply = res.text
-        return reply
+        return reply[:4000] # telegram limit
     except Exception as e:
         return f"AI error: {str(e)[:100]} 😅"
 
 @app.on_message(filters.group & ~filters.me)
-async def group_ai(_, m):
+async def group_ai(_, m: Message):
     if not ai_groups.get(m.chat.id): return
     if not m.text: return
-    if m.reply_to_message or "bot" in m.text.lower():
-        await m.reply_text(await ai_reply(m.from_user.id, m.text))
+    if m.reply_to_message and m.reply_to_message.from_user.is_self or "bot" in m.text.lower():
+        reply = await ai_reply(m.from_user.id, m.text)
+        await m.reply_text(reply)
 
 @app.on_message(filters.private & ~filters.me)
-async def private_ai(_, m):
+async def private_ai(_, m: Message):
     if m.text:
-        await m.reply_text(await ai_reply(m.from_user.id, m.text))
+        reply = await ai_reply(m.from_user.id, m.text)
+        await m.reply_text(reply)
 
 # ================= SHAYARI COMMANDS =================
 @app.on_message(filters.me & filters.command("shayari", [".","/"]))
