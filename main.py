@@ -1,104 +1,152 @@
 import os
 import asyncio
-import datetime
+import random
 from dotenv import load_dotenv
 load_dotenv()
 
-from pyrogram import Client
-from pyrogram.raw.functions.account import UpdateProfile
-from pyrogram.errors import FloodWait, RPCError
+from pyrogram import Client, filters
+from pyrogram.types import Message
+from openai import OpenAI
 
-from PIL import Image, ImageDraw, ImageFont
-
-# --- RAILWAY KEEP ALIVE ---
-from flask import Flask
-from threading import Thread
-app_flask = Flask('')
-@app_flask.route('/')
-def home(): return "OK"
-def run_flask(): app_flask.run(host='0.0.0.0', port=int(os.getenv("PORT", 8080)))
-Thread(target=run_flask, daemon=True).start()
-
-# --- CONFIG ---
+# ================= CONFIG =================
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
-SESSION_STRING = os.getenv("SESSION_STRING")
+SESSION = os.getenv("SESSION")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-USER_NAME = "Kartik Nishad 👑" # Yaha naam daal de
-COLORS = ["#FFD700", "#1E90FF", "#FF4500", "#32CD32", "#8A2BE2", "#FF1493", "#00FFFF", "#FF0000", "#FF8C00", "#9400D3"]
+app = Client("ishikauserbot", api_id=API_ID, api_hash=API_HASH, session_string=SESSION)
+client_ai = OpenAI(api_key=OPENAI_API_KEY)
 
-client = Client("kartik_session", api_id=API_ID, api_hash=API_HASH, session_string=SESSION_STRING)
+# ================= GLOBAL =================
+ai_groups = {}
+ai_mode = "normal"
+user_memory = {}
 
-def make_dp(color_hex):
-    size = 512
-    img = Image.new("RGB", (size, size), color_hex)
-    draw = ImageDraw.Draw(img)
+# ================= AI MODES =================
+MODES = {
+    "normal": "You are a helpful Hinglish assistant.",
+    "savage": "You are savage roasting Hinglish AI.",
+    "gf": "You are a sweet romantic girlfriend.",
+    "funny": "You are funny meme-style AI."
+}
 
-    # Gradient
-    center = size // 2
-    r0,g0,b0 = int(color_hex[1:3],16), int(color_hex[3:5],16), int(color_hex[5:7],16)
-    for i in range(center, 0, -1):
-        r = min(255, r0 + int(200 * (center-i)/center))
-        g = min(255, g0 + int(200 * (center-i)/center))
-        b = min(255, b0 + int(200 * (center-i)/center))
-        draw.ellipse((i,i,size-i,size-i), fill=(r,g,b))
+# ================= SHAYARI DATABASE =================
 
+LOVE = [
+"""तेरी आँखों में जो बात है,
+वो किसी और में कहाँ...
+तेरे बिना ये दिल,
+अब लगता नहीं यहाँ...
+तेरी मुस्कान मेरी जान है,
+तेरी हर बात पहचान है...
+बस तू ही मेरी दुनिया है ❤️""",
+]*15
+
+SAD = [
+"""दिल टूटा है मगर आवाज़ नहीं,
+कोई समझे ऐसा अंदाज़ नहीं...
+रोते हैं अंदर ही अंदर हम,
+पर बाहर कोई राज़ नहीं...
+वो छोड़ गया हमें यूँ ही,
+अब जीना भी सज़ा है 💔""",
+]*15
+
+ATTITUDE = [
+"""हम वो नहीं जो डर जाएं,
+हम वो हैं जो टकराएं...
+दुनिया से क्या डरना हमें,
+हम खुद आग बन जाएं...
+जो जलते हैं हमसे,
+उन्हें जलने दो 😈""",
+]*10
+
+GF = [
+"""तू मेरी जान है,
+तू ही मेरी पहचान है...
+तेरे बिना ये दिल,
+जैसे वीरान है...
+तू हंसे तो दिन बन जाए,
+तू रोए तो दिल टूट जाए ❤️""",
+]*10
+
+ALL = LOVE + SAD + ATTITUDE + GF
+
+# ================= COMMANDS =================
+
+@app.on_message(filters.me & filters.command("ping", [".","/"]))
+async def ping(_, m): await m.edit("🏓 PONG")
+
+@app.on_message(filters.me & filters.command("autoai", [".","/"]) & filters.group)
+async def autoai(_, m):
+    cid = m.chat.id
+    if len(m.command)<2: return await m.edit("Use: .autoai on/off")
+    ai_groups[cid] = m.command[1]=="on"
+    await m.edit(f"AI {'ON' if ai_groups[cid] else 'OFF'}")
+
+@app.on_message(filters.me & filters.command("aimode", [".","/"]))
+async def mode(_, m):
+    global ai_mode
+    ai_mode = m.command[1]
+    await m.edit(f"Mode: {ai_mode}")
+
+@app.on_message(filters.me & filters.command("resetai", [".","/"]))
+async def reset(_, m):
+    user_memory.clear()
+    await m.edit("Memory cleared")
+
+# ================= AI =================
+
+async def ai_reply(uid, text):
+    hist = user_memory.get(uid, [])
+    msgs = [{"role":"system","content":MODES[ai_mode]}] + hist[-5:]
+    msgs.append({"role":"user","content":text})
+    
     try:
-        font_k = ImageFont.truetype("arialbd.ttf", 360)
-        font_t = ImageFont.truetype("arialbd.ttf", 70)
+        res = client_ai.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=msgs
+        )
+        reply = res.choices[0].message.content
+        hist += [{"role":"user","content":text},{"role":"assistant","content":reply}]
+        user_memory[uid]=hist
+        return reply
     except:
-        font_k = ImageFont.load_default()
-        font_t = ImageFont.load_default()
+        return "AI error 😅"
 
-    # 3D K
-    k = "K"
-    bbox = draw.textbbox((0,0), k, font=font_k)
-    wk, hk = bbox[2]-bbox[0], bbox[3]-bbox[1]
-    xk, yk = (size-wk)/2, (size-hk)/2 - 20
-    for i in range(6,0,-1): draw.text((xk+i, yk+i), k, font=font_k, fill="#8B6914")
-    draw.text((xk, yk), k, font=font_k, fill="#FFD700")
+@app.on_message(filters.group & ~filters.me)
+async def group_ai(_, m):
+    if not ai_groups.get(m.chat.id): return
+    if not m.text: return
+    if "bot" in m.text.lower() or m.reply_to_message:
+        await m.reply_text(await ai_reply(m.from_user.id, m.text))
 
-    # TIME
-    ist = datetime.datetime.utcnow() + datetime.timedelta(hours=5, minutes=30)
-    t = ist.strftime("%I:%M %p")
-    bbox2 = draw.textbbox((0,0), t, font=font_t)
-    wt, ht = bbox2[2]-bbox2[0], bbox2[3]-bbox2[1]
-    xt, yt = (size-wt)/2, yk+hk+15
-    draw.text((xt+3, yt+3), t, font=font_t, fill="black")
-    draw.text((xt, yt), t, font=font_t, fill="white")
+@app.on_message(filters.private & ~filters.me)
+async def private_ai(_, m):
+    if m.text:
+        await m.reply_text(await ai_reply(m.from_user.id, m.text))
 
-    img.save("dp.jpg")
-    return "dp.jpg", t
+# ================= SHAYARI COMMANDS =================
 
-async def auto_loop():
-    i = 0
-    await asyncio.sleep(10)
-    while True:
-        try:
-            color = COLORS[i % len(COLORS)]
-            path, time_str = make_dp(color)
-            await client.set_profile_photo(photo=path)
-            os.remove(path)
+@app.on_message(filters.me & filters.command("shayari", [".","/"]))
+async def shayari(_, m):
+    await m.edit(random.choice(ALL))
 
-            new_name = f"{USER_NAME} | {time_str}"
-            await client.invoke(UpdateProfile(first_name=new_name))
+@app.on_message(filters.me & filters.command("shayarilove", [".","/"]))
+async def love(_, m):
+    await m.edit(random.choice(LOVE))
 
-            print(f"✅ Updated: {time_str}")
-            i += 1
-        except FloodWait as e:
-            print(f"⏳ Sleeping {e.value}s")
-            await asyncio.sleep(e.value)
-        except RPCError as e:
-            print(f"❌ Telegram Error: {e}")
-        except Exception as e:
-            print(f"❌ Error: {e}")
-        await asyncio.sleep(60)
+@app.on_message(filters.me & filters.command("shayarisad", [".","/"]))
+async def sad(_, m):
+    await m.edit(random.choice(SAD))
 
-async def main():
-    await client.start()
-    me = await client.get_me()
-    print(f"🔥 LOGIN: {me.first_name} @{me.username}")
-    print("✅ AUTO STARTED")
-    await auto_loop()
+@app.on_message(filters.me & filters.command("shayariattitude", [".","/"]))
+async def att(_, m):
+    await m.edit(random.choice(ATTITUDE))
 
-client.run(main())
+@app.on_message(filters.me & filters.command("shayarigf", [".","/"]))
+async def gf(_, m):
+    await m.edit(random.choice(GF))
+
+# ================= START =================
+print("🔥 FULL AI USERBOT STARTED 🔥")
+app.run()
