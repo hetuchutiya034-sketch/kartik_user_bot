@@ -2,18 +2,29 @@ import os
 import random
 import sqlite3
 import asyncio
+import logging
 from pyrogram import Client, filters
 from pyrogram.types import Message
+from pyrogram.enums import ChatAction
 from flask import Flask
 from threading import Thread
-from pyrogram.enums import ChatAction
+
+# ERROR KO IGNORE KARNE KE LIYE
+logging.basicConfig(level=logging.ERROR)
 
 API_ID = int(os.environ.get("API_ID"))
 API_HASH = os.environ.get("API_HASH")
 SESSION = os.environ.get("SESSION")
 OWNER_ID = int(os.environ.get("OWNER_ID", 0))
 
-app = Client(name="kartikuserbot", api_id=API_ID, api_hash=API_HASH, session_string=SESSION)
+# NO_UPDATES = FALSE LAGA DIYA - CACHE PROBLEM KHATAM
+app = Client(
+    name="kartikuserbot",
+    api_id=API_ID,
+    api_hash=API_HASH,
+    session_string=SESSION,
+    no_updates=False
+)
 app.set_parse_mode("html")
 flask_app = Flask(__name__)
 
@@ -39,30 +50,22 @@ def recall(q):
     data = c.fetchall()
     return random.choice(data)[0] if data else None
 
-# ============= SHAYARI LISTS FULL =============
+# ============= SHAYARI LISTS =============
 DARD_SHAYARI = [
     "Dil tod ke wo muskura rahe hai,\nHum unhe yaad karke ro rahe hai।",
-    "Zakhm itne mile zindagi mein,\nAb dard bhi mehmaan lagta hai।",
-    "Mohabbat bhi kitni ajeeb hoti hai,\nJo apna hota hai wahi door hota hai।",
-    "Teri kami mein ye dil rota hai,\nHar pal bas tujhe hi dhundhta hai।"
+    "Zakhm itne mile zindagi mein,\nAb dard bhi mehmaan lagta hai।"
 ]
 LOVE_SHAYARI = [
     "Tumhari muskaan hi meri jaan hai,\nTumse hi meri pehchaan hai।",
-    "Ishq tumse kuch is tarah hai,\nJaise saans se zindagi।",
-    "Teri aankhon mein doob jana hai,\nBas tujh mein hi kho jana hai।",
-    "Tum mil gaye to laga,\nMujhe meri duniya mil gayi।"
+    "Ishq tumse kuch is tarah hai,\nJaise saans se zindagi।"
 ]
 ATTITUDE_SHAYARI = [
     "Hum se jalne wale bhi kamaal ke hote hai,\nMehfil apni aur charche hamare।",
-    "Naam hi kaafi hai,\nPehchaan banane ke liye।",
-    "Hum wahi hai jo dikhte hai,\nAur jo nahi dikhte wo khatarnaak hai।",
-    "Taqat se nahi, aukaat se baat hoti hai,\nAur hamari aukaat tum soch bhi nahi sakte।"
+    "Naam hi kaafi hai,\nPehchaan banane ke liye।"
 ]
 SAD_SHAYARI = [
     "Aansu bhi kitne ajeeb hote hai,\nKhushi mein bhi aa jate hai।",
-    "Tanha rehna seekh liya hai,\nAb kisi ki zarurat nahi।",
-    "Dil ke armaan aansuon mein beh gaye,\nHum wafa karte karte reh gaye।",
-    "Kisi ko apna bana ke dekho,\nFir use khone ka dard samjhoge।"
+    "Tanha rehna seekh liya hai,\nAb kisi ki zarurat nahi।"
 ]
 
 # ============= HUMAN AI =============
@@ -71,7 +74,8 @@ async def get_owner_mention():
         if OWNER_ID == 0: return "KING"
         user = await app.get_users(OWNER_ID)
         return f"@{user.username}" if user.username else f"<a href='tg://user?id={OWNER_ID}'>KING</a>"
-    except:
+    except Exception as e:
+        print(f"Owner mention error ignore: {e}")
         return "KING"
 
 def human_reply(text, owner_mention):
@@ -81,7 +85,7 @@ def human_reply(text, owner_mention):
     learned = recall(text)
     if learned:
         return learned
-    replies = ["hmm", "acha", "sahi hai", "fir?", "bol kya scene hai", "haan bol", "sun raha hu", "kya hua"]
+    replies = ["hmm", "acha", "sahi hai", "fir?", "bol kya scene hai", "haan bol"]
     return random.choice(replies)
 
 # ============= FLASK =============
@@ -98,7 +102,7 @@ async def ping(_, m: Message):
 
 @app.on_message(filters.me & filters.command("help", "."))
 async def help_menu(_, m: Message):
-    menu = """👑 <b>KARTIK KING USERBOT MENU</b> 👑\n\n<b>1. BASIC</b>\n<code>.ping</code> - Bot check\n<code>.autoai</code> - Group me auto reply on/off\n<code>.dmai</code> - Sirf us DM me auto reply on/off\n\n<b>2. AI MEMORY</b>\n<code>.teach sawal | jawab</code> - Bot ko sikhana\n<b>3. UTILITY</b>\n<code>.afk reason</code> - AFK lagana\n<code>.tagall msg</code> - Sabko tag karna\n<b>4. SHAYARI</b> 💔\n<code>.dard</code> - Dard shayari\n<code>.love</code> - Love shayari\n<code>.attitude</code> - Attitude shayari\n<code>.sad</code> - Sad shayari\n<b>EXTRA</b>\nSticker bhejo → Bot bhi wahi sticker bhejega\n\nMade by KING KARTIK 👑"""
+    menu = """👑 <b>KARTIK KING USERBOT MENU</b> 👑\n\n<b>1. BASIC</b>\n<code>.ping</code> - Bot check\n<code>.autoai</code> - Group me auto reply on/off\n<code>.dmai</code> - Sirf us DM me auto reply on/off\n\n<b>2. AI MEMORY</b>\n<code>.teach sawal | jawab</code> - Bot ko sikhana\n<b>3. UTILITY</b>\n<code>.afk reason</code> - AFK lagana\n<code>.tagall msg</code> - Sabko tag karna\n<b>4. SHAYARI</b> 💔\n<code>.dard</code> <code>.love</code> <code>.attitude</code> <code>.sad</code>\n\nMade by KING KARTIK 👑"""
     await m.edit(menu)
 
 @app.on_message(filters.me & filters.command("autoai", "."))
@@ -123,11 +127,11 @@ async def toggle_dm(_, m: Message):
     if user_id in ai_dms:
         ai_dms.remove(user_id)
         c.execute("DELETE FROM dms WHERE user_id=?", (user_id,))
-        await m.edit("DM AUTO REPLY OFF ❌ Ab is bande ko reply nahi jaayega")
+        await m.edit("DM AUTO REPLY OFF ❌")
     else:
         ai_dms.add(user_id)
         c.execute("INSERT INTO dms VALUES (?)", (user_id,))
-        await m.edit("DM AUTO REPLY ON ✅ Ab sirf is bande ko reply jaayega")
+        await m.edit("DM AUTO REPLY ON ✅")
     conn.commit()
 
 @app.on_message(filters.me & filters.command("teach", "."))
@@ -165,7 +169,7 @@ async def tagall(_, m: Message):
         if mention:
             await app.send_message(m.chat.id, f"{txt}\n{mention}")
     except Exception as e:
-        await m.reply(f"Tagall Error: {e}\nBot ko group me admin banao")
+        await m.reply(f"Tagall Error: {e}")
 
 @app.on_message(filters.me & filters.command("dard", "."))
 async def dard(_, m: Message):
@@ -185,6 +189,7 @@ async def sad(_, m: Message):
 async def group_ai(_, m: Message):
     global afk_status
     try:
+        print(f"GROUP MSG MILA: {m.chat.id}") # DEBUG
         owner_mention = await get_owner_mention()
         if afk_status and m.reply_to_message and m.reply_to_message.from_user.id == OWNER_ID:
             await m.reply(f"💤 KING AFK hai: {afk_reason}")
@@ -203,12 +208,14 @@ async def group_ai(_, m: Message):
         reply = human_reply(m.text, owner_mention)
         await m.reply_text(reply)
     except Exception as e:
-        print(f"Group Error Ignore: {e}") # CRASH NAHI HOGA
+        print(f"Group Error Ignore kiya: {e}") # CRASH NAHI HOGA
 
 @app.on_message(filters.private & ~filters.me)
 async def pm_ai(_, m: Message):
     try:
+        print(f"DM MILA: {m.from_user.id} - {m.text}") # DEBUG
         if m.from_user.id not in ai_dms:
+            print(f"IGNORE: DM OFF hai iske liye")
             return
         owner_mention = await get_owner_mention()
         if m.sticker:
@@ -223,10 +230,12 @@ async def pm_ai(_, m: Message):
         reply = human_reply(m.text, owner_mention)
         await m.reply_text(reply)
     except Exception as e:
-        print(f"PM Error Ignore: {e}")
+        print(f"PM Error Ignore kiya: {e}")
 
 # ============= START =============
 if __name__ == "__main__":
+    print("API_ID:", API_ID)
+    print("OWNER_ID:", OWNER_ID)
     for row in c.execute("SELECT chat_id FROM groups"):
         ai_groups.add(row[0])
     for row in c.execute("SELECT user_id FROM dms"):
