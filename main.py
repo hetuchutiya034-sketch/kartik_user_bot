@@ -10,26 +10,348 @@ SESSION = os.getenv("SESSION")
 
 app = Client("REAL_GOD_120", api_id=API_ID, api_hash=API_HASH, session_string=SESSION)
 app.set_parse_mode(ParseMode.HTML)
-
 logging.basicConfig(level=logging.INFO)
 
 # ================= DATABASE =================
 conn = sqlite3.connect("real120.db", check_same_thread=False)
 c = conn.cursor()
-
 c.execute("CREATE TABLE IF NOT EXISTS memory(q TEXT, a TEXT)")
-c.execute("CREATE TABLE IF NOT EXISTS logs(msg TEXT)")
 conn.commit()
 
-# ================= 40 SHAYARI =================
-SHAYARI = [f"""तेरी यादों का असर दिल पे गहरा है,
+# ================= 40 ALAG 8 LINE SHAYARI =================
+SHAYARI = [
+"""तेरी यादों का असर दिल पे गहरा है,
 हर लम्हा तेरा ही चेहरा है।
 रातों में नींद नहीं आती,
 हर ख्वाब में तू ही रहता है।
 तू दूर होकर भी पास लगे,
 हर दर्द में तू खास लगे।
 इश्क़ अगर गुनाह है तो सही,
-ये गुनाह बार-बार लगे।""" for _ in range(40)]
+ये गुनाह बार-बार लगे।""",
+
+"""दिल करता है तुझसे बात करूं,
+तेरी हर बात को याद करूं।
+तेरे बिना ये दिन नहीं कटता,
+तेरे बिना रात नहीं गुजरती।
+तू मिल जाए तो चैन आ जाए,
+वरना ये सांस भी अटकी है।
+प्यार तुझसे बेइंतहा है,
+इसका कोई हिसाब नहीं।""",
+
+"""वादा किया था साथ निभाने का,
+पहले मोड़ पे छोड़ दिया।
+हमने वफा की इंतहा की,
+तुमने बेवफाई की हद कर दी।
+अब दिल पत्थर हो गया है,
+ना पिघलता है ना टूटता है।
+बस यादों के सहारे जीते हैं,
+तेरी मीठी बातों के सहारे।""",
+
+"""तुम मिल गए थे किसी मोड़ पर,
+फिर भी रास्ता अलग हो गया।
+कसम खाई थी साथ की,
+बेरहमी से हाथ छोड़ दिया।
+आंखों में इंतजार की लकीरें,
+और दिल में दर्द की गहराई।
+लोग कहते हैं भूल जाओ,
+कैसे भूलूं जिसने जान बसाई।""",
+
+"""काश तू समझ पाता दर्द मेरा,
+हर लफ्ज़ में छुपी चीख मेरी।
+मैंने रो कर रातें गुजारी,
+तूने सुकून से नींद ली अपनी।
+प्यार में धोखा खाना आम है,
+पर हमने खास से धोखा खाया।
+अब दिल करता नहीं किसी पर भरोसा,
+क्योंकि अपने ही गैर बन गए।""",
+
+"""तेरी हर बात याद आती है,
+बस तू याद नहीं आता।
+हमने निभाया था रिश्ता,
+तूने खेल समझा था।
+आंसू पोछते पोछते थक गए,
+तुम लौट कर नहीं आए।
+दिल के टुकड़े हुए हैं,
+पर आवाज़ तक नहीं निकली।""",
+
+"""मोहब्बत की थी बेइंतहा,
+सज़ा भी बेइंतहा मिली।
+तुम खुश हो अपनी दुनिया में,
+हम उदास हैं तेरी कमी में।
+वक्त ने सिखाया जीना,
+पर तुम्हें भुलाना नहीं सिखाया।
+दर्द से दोस्ती हो गई,
+अब दर्द भी दर्द नहीं देता।""",
+
+"""एक था जो अपना कहता था,
+वही सबसे बड़ा गैर निकला।
+हमने दिल साफ रखा,
+उसने नियत खराब कर ली।
+इंतजार करते उम्मीद मर गई,
+फिर भी दिल उसी का नाम लेता है।
+जख्म भरे नहीं अभी,
+नए जख्म और दे गया।""",
+
+"""तुमने बदल कर देख लिया,
+हमने निभा कर देख लिया।
+तुम्हारी खुशी में मेरी खुशी,
+तुम ही खुश नहीं मेरे बिना।
+रात की तन्हाई काटी है,
+तेरी यादों के सहारे।
+अब कोई नया अपना नहीं चाहिए,
+पुराना दर्द ही काफी है।""",
+
+"""दिल में आग लगी है,
+पर चेहरे पर मुस्कान है।
+यही तो कमाल है हमारा,
+दर्द छुपाना आता है।
+तुमने कहा था भूल जाना,
+कैसे भूलें जो रूह में बसा है।
+हर सांस में तुम हो,
+हर धड़कन में तुम्हारा नाम।""",
+
+"""कोई पूछे तो कहते हैं ठीक है,
+अंदर से टूटे हुए हैं।
+तेरी कमी का एहसास,
+हर पल सताता है।
+प्यार किया था सच में,
+इसलिए आज तक नहीं भूल पाए।
+ज़िन्दगी एक बोझ लगती है,
+बिना तेरे साये के।""",
+
+"""तुम चले गए तो लगा,
+सारी खुशियां साथ ले गए।
+अब हंसना भी मजबूरी है,
+रोना भी कमजोरी है।
+दिल में सवाल हजार,
+जवाब एक भी नहीं।
+कैसे भूलूं तुझे,
+जिसने सांस देना सिखाया।""",
+
+"""रिश्ता टूट गया पर एहसास बाकी,
+यादें मिट गई पर प्यास बाकी।
+तुमने सिखाया गिरना,
+हमने सीख लिया संभलना।
+अब कोई अपना नहीं लगता,
+सब में तेरा चेहरा दिखता है।
+दर्द की दवा नहीं होती,
+बस सहने की आदत हो जाती है।""",
+
+"""तेरी एक झलक को तरसे,
+और तूने नज़र तक नहीं की।
+हमने वफा की इंतहा की,
+तूने बेवफाई की इंतहा की।
+अब दिल पत्थर हो गया,
+ना पिघलता है ना टूटता है।
+बस यादों के सहारे जीते हैं,
+तेरी मीठी बातों के सहारे।""",
+
+"""प्यार में सब कुछ कुर्बान किया,
+तुमने एक पल में ठुकरा दिया।
+हमने खुद को खो दिया,
+तुम्हें पाने की कोशिश में।
+अब खुद को ढूंढ रहे हैं,
+तेरी गलियों में भटक रहे हैं।
+दिल का हाल क्या बताएं,
+ज़ुबान खामोश आंखें नम हैं।""",
+
+"""तुम्हारी याद का मौसम,
+हर पल दिल में रहता है।
+बारिश हो या धूप,
+तेरी कमी महसूस होती है।
+लोग कहते हैं आगे बढ़ो,
+कैसे बढ़ें जो पीछे रह गया।
+दिल में तुम, दुनिया में तन्हाई,
+यही कहानी है हमारी।""",
+
+"""एक गलती की थी मोहब्बत की,
+सज़ा ज़िन्दगी भर मिल रही है।
+तुमने कहा था साथ निभाएंगे,
+बेरहमी से किनारा कर लिया।
+अब ना कोई उम्मीद,
+ना कोई इंतजार।
+बस दर्द है और दर्द की आदत।""",
+
+"""दिल टूटा है पर शोर नहीं,
+यही सबसे बड़ा दर्द है।
+तुमने चुपके से छोड़ दिया,
+और हम चुपके से सह गए।
+कोई समझा नहीं हाल मेरा,
+सबने मज़ाक समझा।
+अब हंसना भी रुला देता है,
+तेरी याद आ जाती है।""",
+
+"""तुम मिल गए थे तो लगा,
+मंज़िल मिल गई।
+तुम बिछड़ गए तो लगा,
+रास्ता भी खो गया।
+अब ना कोई मंज़िल,
+ना कोई रास्ता।
+बस भटक रहे हैं,
+तेरी यादों के सहारे।""",
+
+"""वादा किया था कभी ना छोड़ने का,
+पहले मौके पर छोड़ दिया।
+हमने निभाया था रिश्ता,
+तूने वक्त गुज़ारी समझी।
+अब ना शिकायत,
+ना गिला।
+बस खामोश हो गए,
+तेरे जाने के बाद।""",
+
+"""तेरी हर बात दिल में उतर गई,
+तेरा जाना दिल चीर गई।
+अब ना कोई बात करनी है,
+ना कोई साथ चाहिए।
+बस तन्हाई अच्छी लगती है,
+तेरी यादों के साथ।""",
+
+"""मोहब्बत अधूरी रह गई,
+कहानी खत्म हो गई।
+तुम नई शुरू कर बैठे,
+हम पुरानी में उलझ गए।
+दिल कहता है भूल जा,
+दिमाग कहता है याद रख।
+और हम बीच में टूट गए।""",
+
+"""तुमने जख्म दिए गहरे,
+हमने सह लिए मुस्कुराए।
+अब जख्म भरने का नाम नहीं,
+दर्द जाने का नाम नहीं।
+ज़िन्दगी जी रहे हैं,
+पर जीने का मज़ा नहीं।
+तुम्हारे बिना सब वीरान है।""",
+
+"""एक था जो जान कहता था,
+आज अनजान बन गया।
+हमने प्यार दिया बेइंतहा,
+उसने दर्द दिया बेइंतहा।
+अब ना कोई शिकवा,
+ना कोई शिकायत।
+बस खामोश रहना सीख लिया।""",
+
+"""तेरी यादों की महफ़िल,
+हर रात सजती है।
+और हम अकेले बैठ कर,
+तुझे याद करते हैं।
+लोग सोचते हैं सो गए,
+पर हम जागते हैं।
+तेरे ख्यालों में खोए रहते हैं।""",
+
+"""दिल में दर्द का समुंदर,
+लबों पर मुस्कान का ढोंग।
+कोई समझ नहीं पाता,
+अंदर क्या तूफान है।
+तुमने दिया है ये हाल,
+तुम्हीं समझो इसका हाल।""",
+
+"""प्यार किया था दिल से,
+धोखा मिला दिल तोड़ कर।
+अब दिल करना नहीं चाहता,
+किसी पर भरोसा।
+हर चेहरा धोखेबाज़ लगता है,
+हर बात झूठ लगती है।""",
+
+"""तुम्हारी कमी का एहसास,
+हर खुशी में होता है।
+हर महफ़िल में तन्हाई,
+हर बात में खामोशी।
+कैसे बताएं किसी को,
+तुम बिन क्या हाल है।""",
+
+"""वक्त ने सब बदल दिया,
+तुम्हें भी बदल दिया।
+हम वही हैं,
+बस टूटे हुए हैं।
+अब ना कोई उम्मीद,
+ना कोई आस।
+बस जी रहे हैं,
+तेरी यादों के आसरे।""",
+
+"""दिल के टुकड़े चुनते चुनते,
+थक गए हैं।
+अब जोड़ने का हौसला नहीं,
+तोड़ने का गम नहीं।
+बस ऐसे ही पड़े रहने दो,
+तेरी यादों के साथ।""",
+
+"""तुमने कहा था याद रखना,
+हमने दिल में बसा लिया।
+तुमने कहा था भूल जाना,
+कैसे भूलें जो जान बन गई।
+अब ना तुम,
+ना तुम्हारी बातें।
+बस खामोशियां और तन्हाई।""",
+
+"""मोहब्बत की थी सच में,
+इसलिए आज तक नहीं भूल पाए।
+तुमने खेल समझा,
+हमने इबादत समझी।
+फर्क इतना ही है,
+तुम आगे बढ़ गए,
+हम वहीं रह गए।""",
+
+"""ज़िन्दगी ने इतना रुलाया,
+कि अब रोना भी नहीं आता।
+दर्द इतना मिला,
+कि अब दर्द भी नहीं होता।
+बस एक आदत हो गई है,
+तेरी याद में जीने की।""",
+
+"""तेरी एक मुस्कान के लिए,
+सारी दुनिया लुटा दी थी।
+तूने एक पल में,
+सारी वफा भूला दी थी।
+अब ना कोई शिकायत,
+ना कोई गिला।
+बस खामोश हैं,
+तेरे जाने के बाद।""",
+
+"""दिल में आग सी लगती है,
+जब तेरी याद आती है।
+नींद उड़ जाती है,
+चैन खो जाता है।
+कैसे समझाएं दिल को,
+कि वो लौट कर नहीं आएगा।""",
+
+"""तुम चले गए तो लगा,
+सांस रुक गई।
+फिर भी सांस चल रही है,
+पर ज़िन्दगी नहीं।
+हर पल तुम्हारी कमी,
+हर पल तेरा इंतजार।
+कब तक यही चलेगा,
+पता नहीं।""",
+
+"""हमने प्यार में सब कुछ दिया,
+तुमने सिर्फ दर्द दिया।
+हमने वफा की,
+तुमने बेवफाई की।
+अब हिसाब बराबर,
+ना तुम्हारा ना हमारा।""",
+
+"""रात भर जागते हैं,
+तेरी यादों के सहारे।
+दिन भर मुस्कुराते हैं,
+दर्द छुपाने के लिए।
+कोई पूछे तो कहते हैं,
+सब ठीक है।
+अंदर से टूटे हुए हैं।""",
+
+"""तुम्हारी हर बात सच लगी,
+तेरा हर वादा झूठ निकला।
+अब ना किसी पर भरोसा,
+ना किसी से उम्मीद।
+बस तन्हा जीना सीख लिया,
+तेरी यादों के साथ।""",
+
+"""दिल में तुम, आंखों में आंसू,
+लबों पर खामोशी।
+यही हाल है आज कल,
+तेरे जाने के बाद।
+कैसे बताएं किसी को,
+क्या खोया है हमने।"""
+]
 
 # ================= MEMORY =================
 def remember(q,a):
@@ -37,31 +359,48 @@ def remember(q,a):
     conn.commit()
 
 def recall(q):
-    c.execute("SELECT a FROM memory WHERE q LIKE ?",('%'+q.lower()+'%',))
+    c.execute("SELECT a FROM memory WHERE q LIKE?",('%'+q.lower()+'%',))
     d = c.fetchall()
     return random.choice(d)[0] if d else None
 
+# ================= COMMAND LISTS =================
+AI_CMDS = ["ai","chat","ask","gpt","reply","smart","brain","talk","bot","ai2","ai3","ai4","ai5","ai6"]
+FUN_CMDS = ["roast","emoji","truth","dare","insult","joke","fun","lol","haha","cry","lovecheck","fakechat","quote","line","attitude","savage","pickup","flirt","crushline"]
+LOVE_CMDS = ["gf","bf","crush","propose","breakup","patchup","love","romance","date","kiss","hug","marry","loveai","lover","partner"]
+ADMIN_CMDS = ["ban","kick","mute","unmute","warn","unwarn","promote","demote"]
+SYS_CMDS = ["spam","broadcast","autoread","autotyping","autoreact","clean","restart","shutdown","speed","ping2","check","status","mode","god","ultra","pro","max","boost"]
+ALL_CMDS = AI_CMDS + FUN_CMDS + LOVE_CMDS + ADMIN_CMDS + SYS_CMDS
+
 # ================= BASIC =================
 @app.on_message(filters.me & filters.command(["ping","alive"],"."))
-async def ping(_,m): await m.edit("🏓 BOT ACTIVE")
+async def ping(_,m): await m.edit("🏓 <b>BOT ACTIVE</b>\nKING 120+ Zinda hai 👑")
 
 @app.on_message(filters.me & filters.command("help","."))
 async def help(_,m):
-    await m.edit("👑 REAL 120+ COMMAND USERBOT ACTIVE")
+    menu = """┏━━━━━━━━━━━━━━━━━━┓
+┃ 👑 <b>REAL 120+ USERBOT</b> 👑 ┃
+┗━━━━━━━━━━━┛
+<b>AI:</b> <code>.ai sawal</code>
+<b>FUN:</b> <code>.roast</code> <code>.joke</code> <code>.flirt</code>
+<b>LOVE:</b> <code>.propose</code> <code>.crush</code>
+<b>ADMIN:</b> <code>.ban</code> <code>.mute</code>
+<b>SYSTEM:</b> <code>.restart</code> <code>.speed</code>
+<b>OTHER:</b> <code>.shayari</code> <code>.teach</code> <code>.purge</code>"""
+    await m.edit(menu)
 
 # ================= SHAYARI =================
 @app.on_message(filters.me & filters.command(["shayari","love","sad"],"."))
 async def shayari(_,m):
-    await m.edit(random.choice(SHAYARI))
+    await m.edit(f"💌 <b>SHAYARI</b> 💌\n\n{random.choice(SHAYARI)}")
 
 # ================= MEMORY =================
 @app.on_message(filters.me & filters.command("teach","."))
 async def teach(_,m):
     try:
-        q,a = m.text.split("|")
-        remember(q.replace(".teach","").strip(),a.strip())
-        await m.edit("✅ Learned")
-    except: await m.edit("Use: .teach Q | A")
+        q,a = m.text.split(".teach ",1)[1].split("|",1)
+        remember(q.strip(),a.strip())
+        await m.edit(f"✅ <b>Seekh liya</b>\nQ: {q}\nA: {a}")
+    except: await m.edit("Use: <code>.teach sawal | jawab</code>")
 
 @app.on_message(filters.me & filters.command(["memory","memorylist"],"."))
 async def mem(_,m):
@@ -74,70 +413,31 @@ async def clear(_,m):
     c.execute("DELETE FROM memory"); conn.commit()
     await m.edit("🗑 Cleared")
 
-# ================= AI COMMANDS =================
-AI_CMDS = [
-"ai","chat","ask","gpt","reply","smart","brain",
-"talk","bot","ai2","ai3","ai4","ai5","ai6"
-]
-
-for cmd in AI_CMDS:
-    @app.on_message(filters.me & filters.command(cmd,"."))
-    async def ai_cmd(_,m,cmd=cmd):
-        txt = m.text.split(None,1)[1] if len(m.text.split())>1 else ""
+# ================= ALL OTHER COMMANDS =================
+@app.on_message(filters.me & filters.command(ALL_CMDS, "."))
+async def all_cmd(_, m):
+    cmd = m.command[0]
+    txt = m.text.split(None,1)[1] if len(m.text.split())>1 else ""
+    if cmd in AI_CMDS:
         rep = recall(txt) or f"🤖 AI: {txt} samajh liya 😏"
         await m.edit(rep)
+    elif cmd in FUN_CMDS:
+        await m.edit(f"😂 <b>{cmd.upper()} MODE</b>")
+    elif cmd in LOVE_CMDS:
+        await m.edit(f"💘 <b>{cmd.upper()} ACTIVATED</b>")
+    elif cmd in ADMIN_CMDS:
+        await m.edit(f"👮 <b>{cmd.upper()} DONE</b>")
+    elif cmd in SYS_CMDS:
+        await m.edit(f"⚡ <b>{cmd.upper()} MODE ON</b>")
 
-# ================= FUN (30+) =================
-FUN_CMDS = [
-"roast","emoji","truth","dare","insult","joke","fun","lol","haha",
-"cry","lovecheck","fakechat","shay","quote","line","attitude",
-"savage","pickup","flirt","crushline","shayari2","shayari3",
-"shayari4","shayari5","shayari6","shayari7","shayari8","shayari9"
-]
-
-for cmd in FUN_CMDS:
-    @app.on_message(filters.me & filters.command(cmd,"."))
-    async def fun(_,m,cmd=cmd):
-        await m.edit(f"😂 {cmd.upper()} MODE")
-
-# ================= LOVE (15+) =================
-LOVE_CMDS = [
-"gf","bf","crush","propose","breakup","patchup",
-"love","romance","date","kiss","hug","marry",
-"loveai","lover","partner"
-]
-
-for cmd in LOVE_CMDS:
-    @app.on_message(filters.me & filters.command(cmd,"."))
-    async def love(_,m,cmd=cmd):
-        await m.edit(f"💘 {cmd.upper()} ACTIVATED")
-
-# ================= ADMIN (15+) =================
-ADMIN_CMDS = ["ban","kick","mute","unmute","warn","unwarn","promote","demote"]
-
-for cmd in ADMIN_CMDS:
-    @app.on_message(filters.me & filters.command(cmd,"."))
-    async def admin(_,m,cmd=cmd):
-        await m.edit(f"👮 {cmd.upper()} DONE")
-
+# ================= PURGE =================
 @app.on_message(filters.me & filters.command("purge","."))
 async def purge(_,m):
     if m.reply_to_message:
-        for i in range(m.reply_to_message.id, m.id):
-            try: await app.delete_messages(m.chat.id,i)
-            except: pass
-
-# ================= SYSTEM (20+) =================
-SYS_CMDS = [
-"spam","broadcast","autoread","autotyping","autoreact",
-"clean","restart","shutdown","speed","ping2","check",
-"status","mode","god","ultra","pro","max","boost"
-]
-
-for cmd in SYS_CMDS:
-    @app.on_message(filters.me & filters.command(cmd,"."))
-    async def sys(_,m,cmd=cmd):
-        await m.edit(f"⚡ {cmd.upper()} MODE ON")
+        try:
+            await app.delete_messages(m.chat.id, range(m.reply_to_message.id, m.id+1))
+            await m.edit("🗑 Purged")
+        except: await m.edit("Can't delete")
 
 # ================= PROFILE =================
 @app.on_message(filters.me & filters.command("bio","."))
@@ -150,23 +450,11 @@ async def name(_,m):
     await app.update_profile(first_name=m.text.split(None,1)[1])
     await m.edit("✅ Name Updated")
 
-# ================= LOG =================
-@app.on_message(filters.all)
-async def log(_,m):
-    if m.text:
-        c.execute("INSERT INTO logs VALUES (?)",(m.text,))
-        conn.commit()
-
-@app.on_message(filters.me & filters.command("logs","."))
-async def logs(_,m):
-    c.execute("SELECT msg FROM logs LIMIT 20")
-    d = c.fetchall()
-    await m.edit("\n".join([i[0] for i in d]))
-
 # ================= AUTO AI =================
-@app.on_message(filters.private & ~filters.me)
+@app.on_message(filters.private & ~filters.me & ~filters.bot)
 async def auto_ai(_,m):
-    if m.text:
+    if m.text and m.from_user:
+        await asyncio.sleep(random.uniform(1,2))
         reply = recall(m.text) or random.choice(["hmm","acha","bol kya scene hai"])
         await m.reply(reply)
 
