@@ -4,7 +4,7 @@ from pyrogram.enums import ParseMode, ChatAction
 
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
-SESSION = os.getenv("SESSION")
+
 
 app = Client("KING_BOT_80", api_id=API_ID, api_hash=API_HASH, session_string=SESSION)
 app.set_parse_mode(ParseMode.HTML)
