@@ -1,217 +1,272 @@
-import os, random, asyncio, sqlite3, logging
 from pyrogram import Client, filters
-from pyrogram.enums import ParseMode, ChatAction
+from pyrogram.types import Message, ChatPrivileges
+from pyrogram.errors import FloodWait, UserAdminInvalid
+import asyncio
+import os
+from gtts import gTTS # TTS ke liye
 
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
+SESSION = os.getenv("SESSION")
 
+app = Client("userbot", api_id=API_ID, api_hash=API_HASH, session_string=SESSION)
 
-app = Client("KING_BOT_80", api_id=API_ID, api_hash=API_HASH, session_string=SESSION)
-app.set_parse_mode(ParseMode.HTML)
-logging.basicConfig(level=logging.INFO)
+tagging = False
 
-# ================= DATABASE =================
-conn = sqlite3.connect("kinggpt.db", check_same_thread=False)
-c = conn.cursor()
-c.execute("CREATE TABLE IF NOT EXISTS memory(q TEXT PRIMARY KEY, a TEXT)")
-conn.commit()
+# /ping
+@app.on_message(filters.me & filters.command("ping"))
+async def ping(client, message: Message):
+    await message.edit("🏓 Pong! Bot zinda hai")
 
-# ============= 30 STICKER ID =============
-STICKER_PACK = [
-"CAACAgUAAxkBAAEBAAIDAAI","CAACAgUAAxkBAAEBAAIEAAI","CAACAgUAAxkBAAEBAAIFAAI",
-"CAACAgUAAxkBAAEBAAIGAAI","CAACAgUAAxkBAAEBAAIHAAI","CAACAgUAAxkBAAEBAAIIAAI",
-"CAACAgUAAxkBAAEBAAIJAAI","CAACAgUAAxkBAAEBAAIKAAI","CAACAgUAAxkBAAEBAAILAAI",
-"CAACAgUAAxkBAAEBAAIMAAI","CAACAgUAAxkBAAEBAAINAAI","CAACAgUAAxkBAAEBAAIOAAI",
-"CAACAgUAAxkBAAEBAAIPAAI","CAACAgUAAxkBAAEBAAIQAAI","CAACAgUAAxkBAAEBAAIRAAI",
-"CAACAgUAAxkBAAEBAAISAAI","CAACAgUAAxkBAAEBAAITAAI","CAACAgUAAxkBAAEBAAIUAAI",
-"CAACAgUAAxkBAAEBAAIVAAI","CAACAgUAAxkBAAEBAAIWAAI","CAACAgUAAxkBAAEBAAIXAAI",
-"CAACAgUAAxkBAAEBAAIYAAI","CAACAgUAAxkBAAEBAAIZAAI","CAACAgUAAxkBAAEBAAIaAAI",
-"CAACAgUAAxkBAAEBAAIbAAI","CAACAgUAAxkBAAEBAAIcAAI","CAACAgUAAxkBAAEBAAIdAAI",
-"CAACAgUAAxkBAAEBAAIeAAI","CAACAgUAAxkBAAEBAAIfAAI","CAACAgUAAxkBAAEBAAIgAAI",
-]
+# /help - TTS ADD KIYA
+@app.on_message(filters.me & filters.command("help"))
+async def help(client, message: Message):
+    text = """🔥 Ishika Userbot Commands 🔥
 
-# ============= 80 SHAYARI - 8 LINE LAMBI =============
-LOVE = [
-"""तेरी आंखों में डूब जाने का दिल करता है और तेरे लबों से मोहब्बत करने को दिल मचलता है, तू मिल जाए तो ये जमाना भूल जाऊं और तेरी बाहों में सारी रात गुजार लूं। प्यार तुझसे बेइंतहा है और इसका कोई हिसाब नहीं रखा, तू धड़कन बन गया है मेरी और तेरे बिना जीना मुश्किल हो गया है।""",
-"""चांद से चेहरे का क्या ही कहना तेरी एक झलक को आंखें तरसती रहती हैं, तेरी बातों में नशा है और तेरी हंसी में जादू बसा है। दिल करता है तुझे अपना कहकर दुनिया को दिखा दूं, तू मेरी जान है तू ही मेरा जहां है।""",
-"""तेरा नाम लबों पे आते ही दिल में सुकून छा जाता है और तेरे बिना हर खुशी अधूरी लगती है, तेरे साथ हर गम भी प्यारा लगता है। वादा कर साथ कभी न छोड़ना क्योंकि मैं टूट जाऊंगा, मोहब्बत की है सच में इसे निभाना पड़ेगा।""",
-"""सांसों में तेरी खुशबू बसी है और धड़कन में तेरा नाम लिखा है, तू मिल जाए तो मुकम्मल हो जाऊं वरना अधूरा ही रह जाऊंगा। इश्क़ में डूबना चाहता हूं तेरी मोहब्बत के समंदर में, तू किनारा बन जा मेरा मैं तेरा सहारा बन जाऊंगा।""",
-"""पहली नजर में प्यार हुआ था तब से दिल तेरा दीवाना है, तेरी एक हंसी के लिए मैं दुनिया से लड़ जाऊंगा। तू साथ हो तो हर मौसम सुहाना लगता है तेरे बिना हर पल वीराना लगता है, बस तू मेरा हो जा और कुछ नहीं चाहना।""",
-"""तेरे ख्यालों में खोया रहता हूं और तेरी यादों में सोया रहता हूं, तू दूर होकर भी पास लगता है तेरा इंतजार खास लगता है। मोहब्बत की इंतहा कर दी अब और क्या करूं, तू समझ जाए बस इतना कि तुझसे बेइंतहा प्यार है।""",
-"""तेरी बातें सुनने को जी करता है और तेरे साथ जीने को जी करता है, तू रूठ जाए तो मान जाऊं तू नाराज हो तो मना लूं। प्यार में सब कुर्बान है तेरे लिए मेरी जान भी कुर्बान, बस एक बार हां कह दे मैं तेरा हो जाऊंगा।""",
-"""दिल में तेरी तस्वीर बसी है और आंखों में तेरा ख्वाब सजा है, तू मिल जाए तो मुकद्दर बदल दूं तेरे नाम अपनी जिंदगी कर दूं। मोहब्बत में धोखा नहीं होता वफा की इंतहा होती है, तू वफा कर मैं वफा करूं रिश्ता ये खास हो जाए।""",
-"""तेरी हंसी में मेरी खुशी है और तेरे आंसू में मेरा गम है, तू खुश रहे तो मैं खुश तू उदास तो मैं उदास। प्यार ये अनमोल है इसे संभाल कर रखना, तू मेरा है और मैं तेरी ये वादा है आखिरी।""",
-"""रात भर तेरे ख्याल आते हैं और दिन में भी तू ही याद आता है, कैसे बताऊं कितना प्यार है लफ्ज़ों में बयां नहीं होता। तू पास हो तो चैन आता है तू दूर हो तो तड़पाता है, जल्दी आ जा मेरी बाहों में इंतजार अब और नहीं होता।""",
-"""तेरे नाम का नशा चढ़ गया है और तेरे इश्क़ में मैं खो गया हूं, दुनिया की परवाह नहीं बस तू चाहिए मुझे। वादा कर साथ निभाने का कसम खा ले प्यार की, मैं तेरे काबिल बन जाऊंगा तू बस मेरा साथ दे दे।""",
-"""तेरी एक झलक को तरसते हैं और तेरी एक बात को सोचते हैं, तू मिल जाए तो सब भूल जाएं तेरे बिना कुछ अच्छा नहीं लगता। मोहब्बत की है दिल से इसलिए आज तक नहीं भूले, तू समझ ले मेरी मजबूरी कि तेरे बिना जीना मुश्किल है।""",
-"""प्यार में सब कुछ देखा है तेरे जैसा कोई नहीं देखा, तू अनमोल है मेरे लिए तू सबसे खास है। तेरे लिए दुनिया छोड़ दूं तेरे लिए खुद को बदल दूं, बस तू मेरा हाथ थाम ले मैं तुझे मंजिल तक ले जाऊंगा।""",
-"""तेरी यादों का सहारा है और तेरी मोहब्बत का नजारा है, दिल करता है तुझसे कहूं कि तुझसे कितना प्यार है। लफ्ज़ कम पड़ जाते हैं जब तेरी बात आती है, तू समझ जा मेरी खामोशी इसमें भी प्यार की आवाज है।""",
-"""इश्क़ में पागल हो गए हैं तेरे नाम की माला जपते हैं, तू मिल जाए तो जन्नत मिल जाए तू बिछड़ जाए तो दोजख मिल जाए। फैसला तू कर ले साथ रहना है या छोड़ना है, मैं तो तेरे साथ आखिरी सांस तक।""",
-"""तेरी बाहों में सुकून मिलता है और तेरे सीने से लगकर चैन आता है, दुनिया की भीड़ में भी तू ही नजर आता है। प्यार ये सच्चा है इसमें कोई झूठ नहीं, तू यकीन कर ले बस मैं तेरे काबिल हूं।""",
-"""तेरे नाम की शायरी लिखते हैं और तेरे नाम की गजल गाते हैं, तू मिल जाए तो मुकम्मल हो जाए वरना अधूरे ही रह जाते हैं। मोहब्बत की है बेइंतहा अब इसका अंजाम क्या होगा, तू साथ दे तो सब मुमकिन वरना सब बेकार हो जाएगा।""",
-"""तेरी आंखों में काजल और तेरे होंठों पे लाली, तू हसीं है सबसे तू सबसे निराली। दिल करता है तुझे चुरा लूं दुनिया से छुपा लूं, तू मेरी है और मेरी ही रहेगी ये वादा है मेरा।""",
-"""प्यार का इजहार कर दूं तेरे सामने खड़ा हो जाऊं, तू हां कह दे तो जी जाऊं तू ना कहे तो मर जाऊं। इतना प्यार करता हूं कि बता नहीं सकता, तू समझ ले मेरी भावना कि तेरे बिना रह नहीं सकता।""",
-"""तेरे इश्क़ में डूबा हूं और तेरे प्यार में खोया हूं, तू मिल जाए तो नशा उतर जाए तू दूर हो तो नशा चढ़ जाए। मोहब्बत की है सच्ची इसमें कोई मिलावट नहीं, तू कदर कर ले मेरी मैं अनमोल हूं।"""
-]
+Tag wale:
+/tagall message - Ek ek karke sabko tag
+/cancel - Tagging rok de
 
-SAD = [
-"""दिल टूटा है पर शोर नहीं यही सबसे बड़ा दर्द है, तुमने चुपके से छोड़ दिया और हम चुपके से सह गए। कोई समझा नहीं हाल मेरा सबने मज़ाक समझा, अब हंसना भी रुला देता है तेरी याद आ जाती है।""",
-"""रात भर जागते हैं तेरी यादों के सहारे और दिन भर मुस्कुराते हैं दर्द छुपाने के लिए, कोई पूछे तो कहते हैं सब ठीक है। अंदर से टूटे हुए हैं।""",
-"""तुम चले गए तो लगा सारी खुशियां साथ ले गए, अब हंसना भी मजबूरी है रोना भी कमजोरी है। दिल में सवाल हजार जवाब एक भी नहीं, कैसे भूलूं तुझे जिसने सांस देना सिखाया।""",
-"""वादा किया था साथ निभाने का पहले मोड़ पे छोड़ दिया, हमने वफा की इंतहा की तुमने बेवफाई की हद कर दी। अब दिल पत्थर हो गया है ना पिघलता है ना टूटता है, बस यादों के सहारे जीते हैं तेरी मीठी बातों के सहारे।""",
-"""तुम मिल गए थे किसी मोड़ पर फिर भी रास्ता अलग हो गया, कसम खाई थी साथ की बेरहमी से हाथ छोड़ दिया। आंखों में इंतजार की लकीरें और दिल में दर्द की गहराई, लोग कहते हैं भूल जाओ कैसे भूलूं जिसने जान बसाई।""",
-"""काश तू समझ पाता दर्द मेरा हर लफ्ज़ में छुपी चीख मेरी, मैंने रो कर रातें गुजारी तूने सुकून से नींद ली अपनी। प्यार में धोखा खाना आम है पर हमने खास से धोखा खाया, अब दिल करता नहीं किसी पर भरोसा क्योंकि अपने ही गैर बन गए।""",
-"""तेरी हर बात याद आती है बस तू याद नहीं आता, हमने निभाया था रिश्ता तूने खेल समझा था। आंसू पोछते पोछते थक गए तुम लौट कर नहीं आए, दिल के टुकड़े हुए हैं पर आवाज़ तक नहीं निकली।""",
-"""मोहब्बत की थी बेइंतहा सज़ा भी बेइंतहा मिली, तुम खुश हो अपनी दुनिया में हम उदास हैं तेरी कमी में। वक्त ने सिखाया जीना पर तुम्हें भुलाना नहीं सिखाया, दर्द से दोस्ती हो गई अब दर्द भी दर्द नहीं देता।""",
-"""एक था जो अपना कहता था वही सबसे बड़ा गैर निकला, हमने दिल साफ रखा उसने नियत खराब कर ली। इंतजार करते उम्मीद मर गई फिर भी दिल उसी का नाम लेता है, जख्म भरे नहीं अभी नए जख्म और दे गया।""",
-"""तुमने बदल कर देख लिया हमने निभा कर देख लिया, तुम्हारी खुशी में मेरी खुशी तुम ही खुश नहीं मेरे बिना। रात की तन्हाई काटी है तेरी यादों के सहारे, अब कोई नया अपना नहीं चाहिए पुराना दर्द ही काफी है।""",
-"""दिल में आग लगी है पर चेहरे पर मुस्कान है, यही तो कमाल है हमारा दर्द छुपाना आता है। तुमने कहा था भूल जाना कैसे भूलें जो रूह में बसा है, हर सांस में तुम हो हर धड़कन में तुम्हारा नाम।""",
-"""कोई पूछे तो कहते हैं ठीक है अंदर से टूटे हुए हैं, तेरी कमी का एहसास हर पल सताता है। प्यार किया था सच में इसलिए आज तक नहीं भूल पाए, ज़िन्दगी एक बोझ लगती है बिना तेरे साये के।""",
-"""रिश्ता टूट गया पर एहसास बाकी यादें मिट गई पर प्यास बाकी, तुमने सिखाया गिरना हमने सीख लिया संभलना। अब कोई अपना नहीं लगता सब में तेरा चेहरा दिखता है, दर्द की दवा नहीं होती बस सहने की आदत हो जाती है।""",
-"""तेरी एक झलक को तरसे और तूने नज़र तक नहीं की, हमने वफा की इंतहा की तूने बेवफाई की इंतहा की। अब दिल पत्थर हो गया ना पिघलता है ना टूटता है, बस यादों के सहारे जीते हैं तेरी मीठी बातों के सहारे।""",
-"""प्यार में सब कुछ कुर्बान किया तुमने एक पल में ठुकरा दिया, हमने खुद को खो दिया तुम्हें पाने की कोशिश में। अब खुद को ढूंढ रहे हैं तेरी गलियों में भटक रहे हैं, दिल का हाल क्या बताएं ज़ुबान खामोश आंखें नम हैं।""",
-"""तुम्हारी याद का मौसम हर पल दिल में रहता है, बारिश हो या धूप तेरी कमी महसूस होती है। लोग कहते हैं आगे बढ़ो कैसे बढ़ें जो पीछे रह गया, दिल में तुम दुनिया में तन्हाई यही कहानी है हमारी।""",
-"""एक गलती की थी मोहब्बत की सज़ा ज़िन्दगी भर मिल रही है, तुमने कहा था साथ निभाएंगे बेरहमी से किनारा कर लिया। अब ना कोई उम्मीद ना कोई इंतजार, बस दर्द है और दर्द की आदत।""",
-"""दिल टूटा है पर शोर नहीं यही सबसे बड़ा दर्द है, तुमने चुपके से छोड़ दिया और हम चुपके से सह गए। कोई समझा नहीं हाल मेरा सबने मज़ाक समझा, अब हंसना भी रुला देता है तेरी याद आ जाती है।""",
-"""तुम मिल गए थे तो लगा मंज़िल मिल गई, तुम बिछड़ गए तो लगा रास्ता भी खो गया। अब ना कोई मंजिल ना कोई रास्ता, बस भटक रहे हैं तेरी यादों के सहारे।""",
-"""वादा किया था कभी ना छोड़ने का पहले मौके पर छोड़ दिया, हमने निभाया था रिश्ता तूने वक्त गुज़ारी समझी। अब ना शिकायत ना गिला, बस खामोश हो गए तेरे जाने के बाद।"""
-]
+Admin wale:
+/promote - Reply karke admin bana
+/demote - Reply karke admin hata  
+/ban - Reply karke ban
+/unban - Reply karke unban
+/mute - Reply karke mute
+/unmute - Reply karke unmute
 
-ATTITUDE = [
-"""हम वो हैं जो अकेले चलते हैं भीड़ में चलना हमें पसंद नहीं, जो इज्जत देगा इज्जत पाएगा जो धोखा देगा वो मिट जाएगा। नाम से नहीं काम से जाने जाते हैं किंग हैं हम रूल से नहीं रूल बनाते हैं।""",
-"""अकड़ दिखाने वालों तुम्हारी औकात पता है हमें, हम शरीफ हैं शराफत से वरना इतिहास गवाह है। एक बार गर्दन उठी तो लोग देखेंगे तमाशा।""",
-"""सुन बे हम कमजोर नहीं बस किसी को तोड़ना नहीं चाहते, तेवर दिखाए तो लोग कहेंगे ये तो तूफान ले आया। इज्जत से रहो इज्जत मिलेगी वरना अंजाम बुरा होगा।""",
-"""हमारे बारे में बात करने से पहले अपनी औकात देख लिया करो, हम शीशे जैसे साफ हैं तुम जैसे कीचड़ नहीं। जो जलते हैं जलने दो हम तो ऐसे ही राज करेंगे।""",
-"""किस्मत बदलने का दम रखते हैं हम किसी के मोहताज नहीं रहते, तेवर ऐसा रखते हैं कि लोग सलाम करते हैं। पैसा नहीं है तो क्या दिल करोड़ों का रखते हैं।""",
-"""हमारी चाल निराली है और हमारी बात लाजवाब है, हम जैसे हैं वैसे ही रहेंगे नकल करना हमारी आदत नहीं। जो हमसे टकराएगा वो मिट्टी में मिल जाएगा।""",
-"""बादशाह हैं हम गुलामी हमें पसंद नहीं, सर झुकाना हमें आता नहीं सर कटाना आता है। नाम सुनकर फूल जाते हैं लोग सामने आकर पसीना छूट जाता है।""",
-"""हम खामोश हैं तो समझो तूफान आने वाला है, हम हंसे तो समझो किसी की खैर नहीं। इज्जत से जीना सिखाया है बेइज्जती करना भी आता है।""",
-"""हमारे दुश्मन भी कहते हैं ये बंदा खतरनाक है, दोस्ती करें तो जान दे दें दुश्मनी करें तो जान ले लें। यही हमारा स्टाइल है पसंद आए तो ठीक वरना निकल।""",
-"""हम वो आग हैं जो बुझती नहीं हम वो तूफान हैं जो रुकता नहीं, हम वो शेर हैं जो झुकता नहीं। समझ आ गया हो तो ठीक।""",
-"""ओकात में रहो तो इज्जत है वरना हमारी नजर में कुछ नहीं, हम सीधा बोलते हैं घुमा फिराकर बात नहीं करते। जो सच है वो सच है मिर्ची लगे तो लगे।""",
-"""हमारी मेहनत बोलती है और हमारा नाम चलता है, हम किसी के पीछे नहीं चलते लोग हमारे पीछे चलते हैं। यही फर्क है हममें और तुममें समझ जाओ तो अच्छा है।""",
-"""हम टूटकर भी मुस्कुराते हैं और गिरकर भी संभल जाते हैं, क्योंकि हम हार मानना जानते नहीं जीत हमारी फितरत है। जो रोक सके रोके हम रुकने वाले नहीं।""",
-"""हमारे तेवर देखकर लोगों के पसीने छूटते हैं, हमारी बात सुनकर लोगों के होश उड़ते हैं। ये पावर है हमारी जो नसीब वालों को मिलती है।""",
-"""हम सीधे हैं तो सीधे टेढ़े हैं तो टेढ़े, दोगलेपन की आदत नहीं जो है मुंह पर है। पसंद आए तो दोस्त वरना रास्ता नाप।""",
-"""हमारा अंदाज सबसे अलग और हमारी सोच सबसे ऊपर, हम भीड़ का हिस्सा नहीं भीड़ हमारे पीछे चलती है। यही पहचान है हमारी जो दुनिया जानती है।""",
-"""हमारी दहाड़ से जंगल हिल जाता है और हमारी नजर से दुश्मन कांप जाता है, ये रुतबा है हमारा जो आसानी से नहीं मिलता।""",
-"""हम मेहनत से उठे हैं किसी की मेहरबानी से नहीं, इसलिए सर ऊंचा रखते हैं आंख में आंख डालकर बात करते हैं। जो जलता है जलने दो हम तो आगे बढ़ेंगे।""",
-"""हमारे शब्द हथियार हैं और हमारी खामोशी बम है, जब बोलते हैं तो असर होता है जब चुप रहते हैं तो खौफ होता है। यही हम हैं पसंद आए तो ठीक।""",
-"""हम किसी से डरते नहीं और किसी से झुकते नहीं, सच का साथ देते हैं गलत का विरोध करते हैं। यही उसूल है हमारे जो मरते दम तक निभाएंगे।"""
-]
+Info wale:
+/id - Chat aur User ID
+/info - Reply karke user info
+/purge - Reply se niche sab delete
 
-DOSTI = [
-"""दोस्ती का मतलब होता है एक के दुख में सबका दुख और एक की खुशी में सबकी खुशी, जान दे देंगे यार के लिए पर यार का साथ नहीं छोड़ेंगे। दोस्ती निभाते निभाते जान भी कुर्बान कर देंगे।""",
-"""यार बिन जिंदगी अधूरी यार ही तो जान है, गम बांट लो तो आधा हो जाए खुशी बांट लो तो दोगुनी। तेरे साथ वाली हर बात दिल के सबसे करीब है।""",
-"""दोस्ती में ना कोई हिसाब ना कोई शिकायत, बस एक वादा है मरते दम तक साथ। तू गिरेगा तो हाथ मेरा तू रोएगा तो कंधा मेरा।""",
-"""यार वो होता है जो अंधेरे में रास्ता दिखाए, मुश्किल में साथ निभाए। पैसों से नहीं खरीदी जाती दोस्ती, दिल से निभाई जाती है।""",
-"""स्कूल के दोस्त सबसे सच्चे होते हैं, ना मतलब ना दिखावा। बस मस्ती मजाक और बेइंतहा प्यार, यही होती है सच्ची यारी।""",
-"""दोस्ती में नाराजगी भी प्यारी लगती है, और मान जाना और भी प्यारा लगता है। यार का एक फोन और सारे गम दूर हो जाते हैं।""",
-"""हम चार यार एक जान, अलग शरीर पर एक ही जान। दुनिया चाहे कुछ भी कहे हमारी दोस्ती सबसे महान।""",
-"""यार का साथ हो तो हर मुश्किल आसान, यार का साथ ना हो तो हर खुशी बेगान। दोस्ती में जान लुटा देंगे पर यारी नहीं तोड़ेंगे।""",
-"""दोस्ती की है तो निभाएंगे, चाहे कुछ भी हो जाए। यार के लिए दुश्मनों से भिड़ जाएंगे, पर यार को कभी रुलाएंगे नहीं।""",
-"""पुराने दोस्त नए नहीं होते, और नए दोस्त पुराने नहीं होते। दोस्ती का रिश्ता सबसे ऊपर होता है, इसमें कोई दो राय नहीं होती।""",
-"""यार के साथ बिताया हर पल सोने जैसा, यार की एक हंसी में हजार गम भूल जाते हैं। ऐसी होती है सच्ची दोस्ती।""",
-"""दोस्ती में धोखा नहीं होता, और मतलब नहीं होता। जो दिल से निभाए वही सच्चा यार होता है।""",
-"""हमारी दोस्ती का कोई तोड़ नहीं, हमारा प्यार कोई मोड़ नहीं। यार के लिए जान हाजिर है, बस यारी बनी रहे।""",
-"""यार बिछड़ जाए तो दिल टूट जाता है, यार मिल जाए तो दिल खुश हो जाता है। दोस्ती में यही तो कमाल है।""",
-"""स्कूल कॉलेज की दोस्ती सबसे प्यारी, ना टेंशन ना फिकर। बस हंसी मजाक और शरारत, यही है असली यारी।""",
-"""दोस्त वो नहीं जो सुख में साथ दे, दोस्त वो है जो दुख में साथ निभाए। ऐसा यार मिल जाए तो किस्मत वाली बात है।""",
-"""हमारी दोस्ती में ना कोई छोटा ना कोई बड़ा, सब बराबर सब अपने। यारी में जान दे देंगे पर पीठ पीछे वार नहीं करेंगे।""",
-"""यार के साथ चाय की चुस्की और घंटों गपशप, यही जिंदगी का असली मजा है। दोस्ती जिंदाबाद।""",
-"""दोस्ती में रूठना मनाना लगा रहता है, पर दिल कभी मैला नहीं होता। यार के लिए दिल में हमेशा जगह होती है।""",
-"""आखिरी सांस तक यारी निभाएंगे, वादा है हमारा। दोस्ती में जान भी कुर्बान है, पर यारी नहीं टूटेगी।"""
-]
+Broadcast wale:
+/broadcast msg - Sabko DM + Group
+/gcast msg - Sirf Groups me
+/dcast msg - Sirf DM me
 
-ALL_SHAYARI = LOVE + SAD + ATTITUDE + DOSTI
+TTS wala:
+/tts text - Text ko voice me convert
 
-def get_shayari(text):
-    text = text.lower()
-    if "love" in text or "pyaar" in text or "pyar" in text:
-        return random.choice(LOVE)
-    if "sad" in text or "dard" in text:
-        return random.choice(SAD)
-    if "attitude" in text or "akd" in text:
-        return random.choice(ATTITUDE)
-    if "dosti" in text or "dost" in text or "yaar" in text:
-        return random.choice(DOSTI)
-    return random.choice(ALL_SHAYARI)
+Made with 💜"""
+    await message.edit(text)
 
-def remember(q,a):
-    c.execute("INSERT OR REPLACE INTO memory VALUES (?,?)",(q.lower(),a))
-    conn.commit()
-def recall(q):
-    c.execute("SELECT a FROM memory WHERE q LIKE?",('%'+q.lower()+'%',))
-    d = c.fetchall()
-    return random.choice(d)[0] if d else None
+# /tts NEW COMMAND
+@app.on_message(filters.me & filters.command("tts"))
+async def tts_cmd(client, message: Message):
+    if len(message.command) < 2:
+        return await message.edit("Use: /tts hello kaise ho")
+    
+    text = " ".join(message.command[1:])
+    await message.edit("🎤 Voice bana raha hu...")
+    
+    try:
+        tts = gTTS(text=text, lang='hi') # 'hi' = Hindi, 'en' = English
+        tts.save("voice.ogg")
+        
+        await client.send_voice(message.chat.id, "voice.ogg", caption=f"TTS: {text}")
+        await message.delete()
+        os.remove("voice.ogg") # file delete
+        
+    except Exception as e:
+        await message.edit(f"Error: {e}")
 
-# ================= COMMANDS =================
-@app.on_message(filters.me & filters.command(["ping","alive"],"."))
-async def ping(_,m): await m.edit("🏓 <b>KING BOT 80 ACTIVE</b>\n80 Shayari + AI + Sticker ON 👑")
+# /tagall - ek karke
+@app.on_message(filters.me & filters.command("tagall"))
+async def tagall(client, message: Message):
+    global tagging
+    if len(message.command) < 2:
+        await message.edit("Use: /tagall message")
+        return
+    
+    tagging = True
+    msg = " ".join(message.command[1:])
+    await message.delete()
+    
+    members = []
+    async for member in client.get_chat_members(message.chat.id):
+        if member.user and not member.user.is_bot and not member.user.is_deleted:
+            members.append(member.user)
+    
+    count = 0
+    for user in members:
+        if not tagging: 
+            await message.reply("Tagging Stopped ❌")
+            break
+            
+        try:
+            await client.send_message(
+                message.chat.id, 
+                f"[{user.first_name}](tg://user?id={user.id}) {msg}"
+            )
+            count += 1
+            await asyncio.sleep(5)
+            
+        except FloodWait as e:
+            await asyncio.sleep(e.value)
+        except:
+            pass
+    
+    if tagging:
+        await message.reply(f"Tagging Complete ✅\nTotal: {count} members")
+    tagging = False
 
-@app.on_message(filters.me & filters.command("help","."))
-async def help(_,m):
-    await m.edit("""┏━━━━━━━━┓
-┃ 👑 <b>KING BOT 80</b> 👑 ┃
-┗━━━━━━━━┛
-<b>.ping</b> = Bot check
-<b>.shayari</b> = Random shayari
-<b>.love</b> = Love shayari
-<b>.sad</b> = Sad shayari
-<b>.attitude</b> = Attitude shayari
-<b>.dosti</b> = Dosti shayari
-<b>.memory</b> = Dekho kya sikha
-<b>.stickeron/off</b> = Sticker reply
+# /cancel
+@app.on_message(filters.me & filters.command("cancel"))
+async def cancel_tag(client, message: Message):
+    global tagging
+    tagging = False
+    await message.edit("Tagging Cancelled")
 
-<b>Auto:</b> "shayari suna", "love shayari", "sad shayari" likho""")
+# /promote
+@app.on_message(filters.me & filters.command("promote"))
+async def promote(client, message: Message):
+    if not message.reply_to_message:
+        return await message.edit("Reply karke use kar")
+    try:
+        await client.promote_chat_member(
+            message.chat.id, message.reply_to_message.from_user.id,
+            privileges=ChatPrivileges(can_manage_chat=True, can_delete_messages=True, can_manage_video_chats=True, can_restrict_members=True, can_promote_members=False, can_change_info=True, can_invite_users=True, can_pin_messages=True)
 
-@app.on_message(filters.me & filters.command("shayari","."))
-async def shayari(_,m): await m.edit(f"💌 <b>SHAYARI</b> 💌\n\n{random.choice(ALL_SHAYARI)}")
-@app.on_message(filters.me & filters.command("love","."))
-async def love(_,m): await m.edit(f"❤️ <b>LOVE</b> ❤️\n\n{random.choice(LOVE)}")
-@app.on_message(filters.me & filters.command("sad","."))
-async def sad(_,m): await m.edit(f"💔 <b>SAD</b> 💔\n\n{random.choice(SAD)}")
-@app.on_message(filters.me & filters.command("attitude","."))
-async def attitude(_,m): await m.edit(f"👑 <b>ATTITUDE</b> 👑\n\n{random.choice(ATTITUDE)}")
-@app.on_message(filters.me & filters.command("dosti","."))
-async def dosti(_,m): await m.edit(f"🤝 <b>DOSTI</b> 🤝\n\n{random.choice(DOSTI)}")
+)
+        await message.edit("✅ Promote kar diya")
+    except UserAdminInvalid:
+        await message.edit("Tu admin nahi hai ya rights nahi hai")
 
-@app.on_message(filters.me & filters.command(["memory","memorylist"],"."))
-async def mem(_,m):
-    c.execute("SELECT * FROM memory")
-    d = c.fetchall()
-    txt = "\n".join([f"<b>Q:</b> {i[0]}\n<b>A:</b> {i[1]}" for i in d[:10]])
-    await m.edit(txt or "Abhi kuch nahi sikha")
+# /demote
+@app.on_message(filters.me & filters.command("demote"))
+async def demote(client, message: Message):
+    if not message.reply_to_message:
+        return await message.edit("Reply karke use kar")
+    try:
+        await client.promote_chat_member(message.chat.id, message.reply_to_message.from_user.id, privileges=ChatPrivileges())
+        await message.edit("✅ Demote kar diya")
+    except:
+        await message.edit("Error aa gaya")
 
-STICKER_MODE = True
-@app.on_message(filters.me & filters.command("stickeron","."))
-async def s_on(_,m): global STICKER_MODE; STICKER_MODE = True; await m.edit("✅ Sticker Reply ON")
-@app.on_message(filters.me & filters.command("stickeroff","."))
-async def s_off(_,m): global STICKER_MODE; STICKER_MODE = False; await m.edit("❌ Sticker Reply OFF")
+# /ban /unban /mute /unmute
+@app.on_message(filters.me & filters.command("ban"))
+async def ban(client, message: Message):
+    if message.reply_to_message:
+        await client.ban_chat_member(message.chat.id, message.reply_to_message.from_user.id)
+        await message.edit("✅ Banned")
+        
+@app.on_message(filters.me & filters.command("unban"))
+async def unban(client, message: Message):
+    if message.reply_to_message:
+        await client.unban_chat_member(message.chat.id, message.reply_to_message.from_user.id)
+        await message.edit("✅ Unbanned")
 
-# ============= AUTO AI + SMART SHAYARI =============
-@app.on_message(filters.private & ~filters.me & ~filters.bot & filters.text)
-async def auto_text(_,m):
-    if m.text:
-        txt = m.text.lower()
-        await app.send_chat_action(m.chat.id, ChatAction.TYPING)
-        await asyncio.sleep(random.uniform(1, 2.5))
+@app.on_message(filters.me & filters.command("mute"))
+async def mute(client, message: Message):
+    if message.reply_to_message:
+        await client.restrict_chat_member(message.chat.id, message.reply_to_message.from_user.id, permissions=message.chat.permissions)
+        await message.edit("🔇 Muted")
 
-        # Smart shayari system
-        if "shayari" in txt:
-            reply = get_shayari(txt)
-        else:
-            mem = recall(txt)
-            reply = mem if mem else "hmm samjha bhai 😎\n\n<i>ye jawab yaad kar liya</i>"
-            remember(txt, reply)
-        await m.reply(reply)
+@app.on_message(filters.me & filters.command("unmute"))
+async def unmute(client, message: Message):
+    if message.reply_to_message:
+        await client.restrict_chat_member(message.chat.id, message.reply_to_message.from_user.id, permissions=message.chat.permissions)
+        await message.edit("🔊 Unmuted")
 
-# ============= AUTO STICKER REPLY =============
-@app.on_message(filters.private & ~filters.me & ~filters.bot & filters.sticker)
-async def auto_sticker(_,m):
-    if STICKER_MODE:
-        await asyncio.sleep(0.5)
-        await m.reply_sticker(random.choice(STICKER_PACK))
+# /id
+@app.on_message(filters.me & filters.command("id"))
+async def get_id(client, message: Message):
+    await message.edit(f"Chat ID: {message.chat.id}\nYour ID: {message.from_user.id}")
 
-print("👑 KING BOT 80 STARTED 👑")
+# /info
+@app.on_message(filters.me & filters.command("info"))
+async def userinfo(client, message: Message):
+    if not message.reply_to_message:
+        return await message.edit("Reply karke use kar")
+    user = message.reply_to_message.from_user
+    text = f"""User Info:
+Name: {user.first_name} {user.last_name or ""}
+Username: @{user.username or "None"}
+ID: {user.id}
+Bio: {user.bio or "None"}"""
+    await message.edit(text)
+
+# /purge
+@app.on_message(filters.me & filters.command("purge"))
+async def purge(client, message: Message):
+    if not message.reply_to_message:
+        return await message.edit("Reply karke use kar")
+    chat_id = message.chat.id
+    msg_id = message.reply_to_message.id
+    await message.delete()
+    for i in range(msg_id, message.id):
+        try:
+            await client.delete_messages(chat_id, i)
+        except:
+            pass
+    await client.send_message(chat_id, "✅ Purged", disable_notification=True)
+
+# /broadcast
+@app.on_message(filters.me & filters.command("broadcast"))
+async def broadcast(client, message: Message):
+    if len(message.command) < 2:
+        return await message.edit("Use: /broadcast your message")
+    
+    msg = " ".join(message.command[1:])
+    await message.edit("📢 Broadcast Starting...")
+    
+    sent = 0
+    failed = 0
+    async for dialog in client.get_dialogs():
+        if dialog.chat.type in ["private", "group", "supergroup"]:
+            try:
+                await client.send_message(dialog.chat.id, f"📢 KARTIK KI TARAF SE 🌹❤️\n\n{msg}")
+                sent += 1
+                await asyncio.sleep(3)
+            except FloodWait as e:
+                await asyncio.sleep(e.value)
+            except:
+                failed += 1
+    
+    await message.reply(f"Broadcast Complete ✅\nSent: {sent} chats\nFailed: {failed} chats")
+
+# /gcast
+@app.on_message(filters.me & filters.command("gcast"))
+async def gcast(client, message: Message):
+    if len(message.command) < 2:
+        return await message.edit("Use: /gcast your message")
+    
+    msg = " ".join(message.command[1:])
+    await message.edit("📢 Group Broadcast Starting...")
+    
+    sent = 0
+    async for dialog in client.get_dialogs():
+        if dialog.chat.type in ["group", "supergroup"]:
+            try:
+                await client.send_message(dialog.chat.id, f"📢 Group Broadcast\n\n{msg}")
+                sent += 1
+                await asyncio.sleep(3)
+            except:
+                pass
+    
+    await message.reply(f"Group Broadcast Complete ✅\nSent: {sent} groups")
+
+# /dcast
+@app.on_message(filters.me & filters.command("dcast"))
+async def dcast(client, message: Message):
+    if len(message.command) < 2:
+        return await message.edit("Use: /dcast your message")
+    
+    msg = " ".join(message.command[1:])
+    await message.edit("📢 DM Broadcast Starting...")
+    
+    sent = 0
+    async for dialog in client.get_dialogs():
+        if dialog.chat.type == "private" and not dialog.chat.is_bot:
+            try:
+                await client.send_message(dialog.chat.id, f"📢 Message\n\n{msg}")
+                sent += 1
+                await asyncio.sleep(3)
+            except:
+                pass
+    
+    await message.reply(f"DM Broadcast Complete ✅\nSent: {sent} users")
+
+print("Userbot Started!")
 app.run()
