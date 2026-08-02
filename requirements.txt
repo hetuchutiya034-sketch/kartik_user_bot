@@ -1,6 +1,3 @@
 pyrogram
 tgcrypto
 gTTS
-sqlite3
-asyncio
-logging
