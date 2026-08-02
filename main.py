@@ -229,29 +229,35 @@ async def purge(client, message: Message):
     except Exception as e:
         await client.send_message(chat_id, f"Error: {e}")
 
-# /broadcast - SAFE
+# /broadcast - FIXED VERSION
 @app.on_message(filters.me & filters.command("broadcast"))
 async def broadcast(client, message: Message):
     if len(message.command) < 2:
         return await message.edit("Use: <code>/broadcast your message</code>")
     
     msg = " ".join(message.command[1:])
-    status = await message.edit("📢 Broadcast Starting...")
+    status = await message.edit("📢 Broadcast Starting... 0 chats scanned")
     
     sent = 0
     failed = 0
+    total = 0
+    
     async for dialog in client.get_dialogs():
+        total += 1
+        if total % 10 == 0: # har 10 chat baad update
+            await status.edit(f"📢 Scanning... {total} chats checked\nSent: {sent}")
+            
         if dialog.chat.type in ["private", "group", "supergroup"]:
             try:
                 await client.send_message(dialog.chat.id, f"📢 <b>KARTIK KI TARAF SE</b> 🌹❤️\n\n{msg}")
                 sent += 1
-                await asyncio.sleep(8) # 8 sec delay
+                await asyncio.sleep(12) # 12 sec kar diya safety ke liye
             except FloodWait as e:
-                await asyncio.sleep(e.value + 10)
+                await asyncio.sleep(e.value + 15)
             except:
                 failed += 1
     
-    await status.edit(f"Broadcast Complete ✅\n<b>Sent:</b> {sent} chats\n<b>Failed:</b> {failed} chats")
+    await status.edit(f"Broadcast Complete ✅\n<b>Total Scanned:</b> {total}\n<b>Sent:</b> {sent}\n<b>Failed:</b> {failed}")
 
 # /gcast - SAFE
 @app.on_message(filters.me & filters.command("gcast"))
