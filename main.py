@@ -32,7 +32,7 @@ ROAST_LINES = [
     "{name} bhai tu school ki wo assembly hai jisme sabko neend aati hai",
     "{name} teri personality dekh ke WiFi bolta hai network not found",
     "{name} tu itna boring hai ki Netflix bhi tujhe 'Are you still watching' pooche",
-    # yaha aur 990 line add kar de
+    # yaha aur 990 line add kar 
 ]
 
 async def get_chat_id(client, chat_input):
