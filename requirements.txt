@@ -1,5 +1,5 @@
-   pyrogram
-   tgcrypto
-   pytgcalls==3.0.0.dev18
-   gTTS
-   ffmpeg-python
+pyrogram
+tgcrypto
+pytgcalls==3.0.0.dev6
+gTTS
+ffmpeg-python
