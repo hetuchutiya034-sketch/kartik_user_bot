@@ -1,4 +1,4 @@
-    pyrogram
-    tgcrypto
-    pytgcalls==3.0.0.dev6
-    gTTS
+pyrogram
+tgcrypto
+pytgcalls==3.0.0.dev16
+gTTS
