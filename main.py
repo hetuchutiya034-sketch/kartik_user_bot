@@ -5,7 +5,7 @@ from pyrogram import Client, filters
 from pyrogram.types import Message, ChatPrivileges, ChatPermissions
 from pyrogram.errors import FloodWait, UserAdminInvalid
 from pytgcalls import PyTgCalls
-from pytgcalls.types import AudioPiped
+from pytgcalls.types.input_stream import AudioPiped
 from gtts import gTTS
 
 API_ID = int(os.getenv("API_ID"))
