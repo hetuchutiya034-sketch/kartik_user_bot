@@ -1,4 +1,9 @@
-pyrogram>=2.0.106
+pyrogram==2.0.106
 tgcrypto
-pytgcalls==3.0.0.dev16
+python-dotenv
+google-generativeai
+requests
+apscheduler
+uvloop
+psutil
 gTTS
